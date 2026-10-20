@@ -28,4 +28,6 @@ export PHOREPOC_ADAPTATIONS=../adaptation-x86-64:../adaptation-pc
 
 ## Licence
 
-Eclipse Public License 1.0 (see `LICENSE`).
+Eclipse Public License 1.0 (see `LICENSE`), copyright The Phorepoc Authors (`AUTHORS`, `NOTICE`).
+
+Contributions are welcome under the same terms: add yourself to `AUTHORS`.

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # hal_census_x32.sh -- IN-CONTAINER: compile HAL (the user-side HAL client, hal.dll) for the
 # Path C target (amd64 CPU, x32 ABI). Sibling of euser_census_x32.sh / efsrv_census_x32.sh.
 #   LINK=1: keep objects + publish the compile line (flags.txt) for emitter/build_hal_x32.py.

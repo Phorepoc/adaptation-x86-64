@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // u32exec.h -- Phorepoc amd64/x32: SHADOWS include/u32exec.h (this directory is first on the user
 // include path). Same contract as the IA-32 branch of the original -- the executive gate is EKA2's
 // own: int 0x20 fast / int 0x21 slow, call number in EAX, arguments in ECX, EDX, EBX, ESI, result in

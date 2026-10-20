@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // xe_exctrap_asm.h -- the register save/resume sequences behind TExcTrap / TPagingExcTrap
 // (Intel syntax). In a header so the hosted run-test exctrap_test.c exercises the EXACT
 // instruction sequences the kernel uses. rdi = trap object (iState at offset 0), esi = result.

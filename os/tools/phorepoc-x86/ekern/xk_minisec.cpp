@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_minisec.cpp -- Phorepoc amd64/x32: the first USER-MODE program. amd64 sibling of Track B's
 // tools/kernel/minisec.s: a stand-in for the ROM "secondary" (efile.exe's slot) that exstart.cpp
 // launches as a real DProcess. It runs in ring 3, XIP from the ROM (whole ROM = user-readable),

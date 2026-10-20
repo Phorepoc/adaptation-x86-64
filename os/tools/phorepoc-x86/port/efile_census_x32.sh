@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # efile_census_x32.sh -- IN-CONTAINER: compile census of EFILE (the F32 file server) for the
 # Path C target (amd64 CPU, x32 ABI). UNMODIFIED baseline source, the TU list of sfile/efile.mmp.
 # Sibling of euser_census_x32.sh / ekern_census_x32.sh: compile-only, never stops on failure,

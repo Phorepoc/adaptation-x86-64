@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xe_kernel.cpp -- Phorepoc amd64/x32: the kernel-level (ekern) arch backend. amd64 siblings of
 // the IA-32 MSVC-asm files kernel/x86/{ckernel,cexec,cutils,csched}.cia + klib/x86/cumem.cia.
 // C++ wherever the original was asm only for speed; naked asm only where register state IS the

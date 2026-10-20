@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xe_nkern.cpp -- Phorepoc amd64/x32: the nanokernel-API tail that only the FULL kernel
 // (ekern) references, so the nkernsmp-only image never needed it. amd64 siblings of
 // nkernsmp/x86/{ncutils.cpp,ncutils.cia,ncsched.cia,ncutilf.cia,ncthrd.cpp} pieces.

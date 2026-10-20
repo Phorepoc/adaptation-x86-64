@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // xk_interrupt.h -- the board's device-interrupt constants and hooks (xk_interrupt.cpp). X4.21.
 #ifndef XK_INTERRUPT_H
 #define XK_INTERRUPT_H

@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_media.cpp -- brings up the REAL local-media stack as built-in kernel extensions (X4.17).
 //
 // The amd64 sibling of Track B's tools/kernel/ekern_media_glue.cpp. In a real ROM these are

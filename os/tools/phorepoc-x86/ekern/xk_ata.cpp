@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_ata.cpp -- the Phorepoc amd64 board's hard disk: an ATA (IDE) PIO media driver behind the REAL
 // ELOCD (drivers/locmedia). X4.22.
 //

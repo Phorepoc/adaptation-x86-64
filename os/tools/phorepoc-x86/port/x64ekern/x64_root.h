@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // x64_root.h -- the per-CPU long-mode root tables (design: xe_mmu.cpp, docs X4.3b).
 #ifndef X64_ROOT_H
 #define X64_ROOT_H

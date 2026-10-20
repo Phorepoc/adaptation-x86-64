@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xu_exe.cpp -- Phorepoc amd64/x32: the EXE entry stub (eexe.lib). Sibling of
 // euser/epoc/x86/uc_exe.cia (_E32Startup) + uc_exe.cpp (RunThread; the original is MSVC-CRT flavoured).
 // Entry contract = IA-32's (kernel side: x64ekern/xe_kernel.cpp X64_EnterUser):

@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 /* ctxsw_test.c -- unit test for the Phorepoc amd64 context switch primitive
  * (x64_ctxsw.S). Cooperative ping-pong: a main context creates two "threads",
  * each with a stack primed the way NThread::Create will prime it, and they hand

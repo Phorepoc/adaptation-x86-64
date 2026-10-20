@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # build_nkernsmp_probe.sh -- IN-CONTAINER: SMP slice 2b probe. Try to compile the
 # arch-NEUTRAL nkernsmp source (the SMP nanokernel: per-CPU TSubScheduler, SMP
 # kernel lock, IPI reschedule) UNMODIFIED for amd64, against our amd64 port prelude.

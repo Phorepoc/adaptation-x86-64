@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // rvmwsvgachannel.h -- OURS (docs/phorepoc/vm-gpu-options.md S2): the user-side API of the VMware SVGA II / SVGA3D kernel driver
 // (tools/phorepoc-x86/ekern/xk_vmwsvga.cpp, built into ekern, device "VmwSvga"). The Symbian counterpart of the DRM_VMW_* ioctls the Mesa
 // `svga` winsys uses, in the shape of RMaliChannel:

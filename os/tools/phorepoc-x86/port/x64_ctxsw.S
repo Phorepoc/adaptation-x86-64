@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 /* x64_ctxsw.S -- Phorepoc amd64 context switch primitive.
  *
  * The heart of TScheduler::Reschedule on amd64: save the current thread's

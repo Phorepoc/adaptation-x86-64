@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // e32math.h -- HOSTED TEST SHIM (realx_test.cpp only; never on the euser include path).
 // Reproduces exactly the TRealX class of baseline .../eka/include/e32math.h (member order, types,
 // signatures) plus the handful of e32def.h/e32err.h names xu_realx.cpp uses, so the real

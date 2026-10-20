@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # build_realx_test.sh -- IN-CONTAINER, hosted: build + run realx_test.cpp against the REAL
 # xu_realx.cpp (unmodified; only <e32math.h> is the class-layout shim in realx_test_shim/), at
 # -O2 and -O0, 64-bit and (if the image has the x32 runtime) not at all for x32 -- the target

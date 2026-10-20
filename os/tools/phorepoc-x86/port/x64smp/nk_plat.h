@@ -1,3 +1,7 @@
+/* Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+ * Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // tools/phorepoc-x86/port/x64smp/nk_plat.h
 //
 // PHOREPOC amd64 SMP nanokernel platform header -- the 64-bit sibling of EKA2's

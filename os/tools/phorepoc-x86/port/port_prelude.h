@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 /* port_prelude.h -- Phorepoc amd64 kernel-port toolchain prelude.
  *
  * Force-included (-include) ahead of the real EKA2 headers when building the

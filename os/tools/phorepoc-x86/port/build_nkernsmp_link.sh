@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # build_nkernsmp_link.sh -- IN-CONTAINER: SMP slice 2b step 2 LINK probe. Compile
 # the arch-NEUTRAL nkernsmp core UNMODIFIED for amd64 AND our amd64 SMP backend
 # (x64smp/x64s_*), then FULL-link to prove the backend symbol surface is CLOSED

@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_camerasc.cpp -- Path C (camera-plan.md C1): the two built-in-device factories of the camera driver pair (rombuild --builtin-device; xboot.cpp points
 // export 1 of Sys\Bin\ecamerasc.ldd / camerasc.pdd here), exactly as the sound driver's (xk_ac97.cpp). The LDD is the 2010 DCameraScLdd and the PDD the 2010
 // template PDD (a fake sensor), both compiled unmodified with only their entry points renamed (make_ekern.sh); the user API is RDevCameraSc ("CameraSc").

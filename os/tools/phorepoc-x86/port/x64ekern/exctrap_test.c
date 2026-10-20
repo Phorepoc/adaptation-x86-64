@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 /* exctrap_test.c -- hosted run-test of the TExcTrap register save/resume sequences
  * (xe_exctrap_asm.h), the same way ctxsw_test.c proved the context switch. Hosted = LP64
  * (an x32 process needs an x32 libc + CONFIG_X86_X32 host kernel); the sequences touch only

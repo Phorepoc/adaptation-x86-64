@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // variantmediadef.h -- the Phorepoc amd64 board's local-media map (VariantMediaDefIncludePath).
 // Read by the unmodified drivers/medint/iram.cpp (the internal RAM drive).
 //

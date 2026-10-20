@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 /* x64_atomics.cpp -- Phorepoc amd64 arch backend: the e32atomics primitives
  * the arch-neutral nkern core actually references, implemented in x86_64.
  *

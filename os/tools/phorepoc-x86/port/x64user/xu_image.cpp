@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xu_image.cpp -- Phorepoc amd64/x32: the bits EVERY E32Image carries, whatever its target type.
 //
 // Split out of xu_dll.cpp at X4.12, when EFILE.EXE became the first EXE with an export table

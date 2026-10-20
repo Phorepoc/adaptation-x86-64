@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xe_mmu.cpp -- Phorepoc amd64/x32: MMU primitives + address-space switch + the board/variant
 // symbols the kernel expects. amd64 siblings of memmodel/epoc/multiple/x86/{xmmu,xsched}.cia.
 // Surface list: docs/phorepoc/ekern-x32-backend-surface.txt. X64_TODO = honest first cut.

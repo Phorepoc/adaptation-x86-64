@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_interrupt.cpp -- the Phorepoc amd64 board's device interrupts: the variant's Interrupt API over
 // the nanokernel's NIrq layer, on an IOAPIC. X4.21.
 //

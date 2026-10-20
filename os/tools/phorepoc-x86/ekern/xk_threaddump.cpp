@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_threaddump.cpp -- Path C debug aid: a one-shot dump of every thread, N seconds after boot (X4.27).
 //
 // make_ekern.sh DUMP=<seconds>. For the "everything is waiting and nothing says why" kind of hang: per

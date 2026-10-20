@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // xk_absmouse.h -- the absolute pointer devices of the hypervisors (xk_absmouse.cpp, X4.35)
 #ifndef XK_ABSMOUSE_H
 #define XK_ABSMOUSE_H

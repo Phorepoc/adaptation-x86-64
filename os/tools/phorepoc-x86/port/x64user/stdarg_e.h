@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 /* stdarg_e.h -- Path C x32 override of ESTLIB's epoc32/include/libc/stdarg_e.h (X4.41).
  *
  * The original defines va_list as `char*` and va_arg as a walk up a CONTIGUOUS STACK of int-sized

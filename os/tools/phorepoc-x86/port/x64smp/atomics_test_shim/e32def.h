@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // e32def.h -- HOSTED TEST SHIM (atomics_test.cpp only; never on the kernel/euser include path).
 // x64s_atomics.cpp uses a handful of names from the real .../eka/include/e32def.h; this supplies
 // exactly those so the REAL file compiles unmodified next to libc. The target build uses the real

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # build_atomics_test.sh -- IN-CONTAINER, hosted: build + run atomics_test.cpp against the REAL
 # x64s_atomics.cpp (unmodified; only <e32def.h> is the shim in atomics_test_shim/), at -O2 and
 # -O0. Semantics test, not a concurrency test -- the SMP proof is the kernel itself.

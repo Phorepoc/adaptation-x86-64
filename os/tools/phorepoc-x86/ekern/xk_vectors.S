@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 /* xk_vectors.S -- Phorepoc amd64/x32 kernel image: the 256 interrupt-gate entry stubs.
  * Every vector funnels into X64_Trap(frame) (xk_irq.cpp): interrupts are dispatched and return
  * through the iretq below (possibly after a reschedule); CPU exceptions still go to the loud

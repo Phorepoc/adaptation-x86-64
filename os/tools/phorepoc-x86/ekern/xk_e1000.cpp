@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_e1000.cpp -- the Phorepoc amd64 board's network card: Intel 8254x "e1000". X4.47.
 //
 // One driver for both hypervisors we run on: QEMU's default NIC is the e1000 (82540EM, 8086:100E) and

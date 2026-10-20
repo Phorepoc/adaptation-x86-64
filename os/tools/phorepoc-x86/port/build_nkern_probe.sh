@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # build_nkern_probe.sh -- IN-CONTAINER: compile the arch-NEUTRAL EKA2 nkern
 # source UNMODIFIED for a freestanding x86_64 target, against our amd64 port
 # prelude + arch backend. The real "portable kernel on amd64" work, growing one

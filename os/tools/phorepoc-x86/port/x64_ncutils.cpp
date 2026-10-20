@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 /* x64_ncutils.cpp -- Phorepoc amd64 arch backend: the low-level NKern CPU
  * primitives the arch-neutral nkern core references but that are inherently
  * machine-specific. The amd64 analogue of nkern/x86/ncutils.cpp + the ARM

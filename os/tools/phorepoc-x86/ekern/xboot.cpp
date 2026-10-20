@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xboot.cpp -- Phorepoc amd64/x32 BOOTSTRAP. The C++ sibling of the IA-32 bootstrap
 // (kernel/x86/bootmain.asm + bootutil.asm, steps 3-5) for the FLEXIBLE memory model.
 //

@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 /* x64s_atomics.cpp -- Phorepoc amd64 SMP arch backend: the full e32atomics
  * primitive set the arch-neutral nkernSMP core references.
  *

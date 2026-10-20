@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xu_cxxrt.cpp -- Phorepoc amd64/x32: the modern-g++ runtime leaves that no 2010 TU provides.
 // The amd64 sibling of toolchain/euser_dll/cxx_rt_dev.cpp (ARM). Linked by an image that needs
 // them; euser does not (its census TUs already cover everything it references).

@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 /* x64s_ncsched.cpp -- Phorepoc amd64 SMP arch backend: the scheduler / per-CPU /
  * IPI / fault core the arch-neutral nkernSMP references but that is inherently
  * machine-specific. The SMP analogue of nkernsmp/x86/{ncglob,ncsched,ncthrd,

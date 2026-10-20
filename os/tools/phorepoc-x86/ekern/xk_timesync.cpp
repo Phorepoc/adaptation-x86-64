@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_timesync.cpp -- the Phorepoc amd64 board keeps its clock on the host's time. X4.42.
 //
 // EKA2 reads the RTC once at boot (X4.31) and from then on counts ticks. In a VM those ticks stop

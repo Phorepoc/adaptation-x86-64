@@ -1,3 +1,7 @@
+// Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // realx_test.cpp -- HOSTED test of xu_realx.cpp (the amd64/x32 TRealX). Built by build_realx_test.sh
 // against realx_test_shim/e32math.h (an exact copy of the TRealX class declaration; the real Symbian
 // headers do not coexist with libc/libm in one hosted TU). The oracle is the host's x87 long double:

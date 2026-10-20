@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 /* x64s_ncutils.cpp -- Phorepoc amd64 SMP arch backend: the low-level, per-CPU
  * NKern CPU primitives the arch-neutral nkernSMP core references. The SMP
  * analogue of nkernsmp/x86/ncutils.cpp + ncutilf.cpp. Pure CPU ops + the

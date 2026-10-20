@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_power.cpp -- the Phorepoc amd64 board's power controller + power handler. X4.74.
 //
 // The generic kernel power manager (kernel/eka/kernel/power.cpp) starts with a DummyPowerController

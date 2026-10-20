@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_absmouse.cpp -- the Phorepoc amd64 board's ABSOLUTE pointer: "mouse integration". X4.35.
 //
 // A PS/2 mouse is relative, so a hypervisor has to GRAB the host pointer to feed it (VirtualBox: the

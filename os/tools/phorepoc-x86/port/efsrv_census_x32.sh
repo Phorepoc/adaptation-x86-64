@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: EPL-1.0
+
 # efsrv_census_x32.sh -- IN-CONTAINER: compile census of EFSRV (the F32 CLIENT library, efsrv.dll)
 # for the Path C target (amd64 CPU, x32 ABI). UNMODIFIED baseline source, the TU list of
 # sfsrv/efsrv.mmh. Sibling of euser_census_x32.sh / efile_census_x32.sh.

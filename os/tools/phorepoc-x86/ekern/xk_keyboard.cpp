@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // xk_keyboard.cpp -- the Phorepoc amd64 board's PS/2 controller (i8042): keyboard AND mouse. X4.18,
 // interrupt-driven since X4.21.
 //

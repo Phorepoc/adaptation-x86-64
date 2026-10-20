@@ -1,3 +1,6 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: EPL-1.0 */
+
 // tools/phorepoc-x86/port/x64smp/relax_size_asserts.h
 //
 // PHOREPOC amd64 SMP port shim. Force-included AFTER e32def.h so it wins.

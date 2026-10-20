@@ -1,3 +1,6 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: EPL-1.0
+
 // atomics_test.cpp -- HOSTED test for the REAL x64smp/x64s_atomics.cpp (compiled unmodified
 // against atomics_test_shim/e32def.h). Written for X4.9b, when the xor and tas families were
 // added for euser's export table, but it covers the whole e32atomics surface the file provides.
