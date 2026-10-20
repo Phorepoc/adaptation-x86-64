@@ -6,7 +6,7 @@
  * These are things the original Symbian build ENVIRONMENT supplied (via the VC
  * x86 / RVCT ARM toolchains + build macros), not the source. We are compiling a
  * static, freestanding kernel with GCC, so we provide the equivalents here --
- * the analogue of the Track-T modern-GCC prefix shim (../../../AlmanacOfMemories/modern-gcc-toolchain.md).
+ * the analogue of the ARM build's modern-GCC prefix shim.
  * NOTHING here modifies baseline source; it only fills toolchain-provided gaps.
  */
 #ifndef PHOREPOC_PORT_PRELUDE_H
