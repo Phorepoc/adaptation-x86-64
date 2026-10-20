@@ -23,7 +23,7 @@
 #define ATA_NUMMEDIA    1
 
 // X4.111: the memory card = the ATA primary SLAVE (QEMU/VirtualBox second disk). A removable drive on local drive 4
-// (estart.txt: F:, where the 701 has its card; E: = mass memory there).
+// (estart.txt: F:, where S60 phones have the memory card; E: = mass memory there).
 #define MEDIA_DEVICE_CARD EFixedMedia2
 #define CARD_DRIVECOUNT 1
 #define CARD_DRIVELIST  4
