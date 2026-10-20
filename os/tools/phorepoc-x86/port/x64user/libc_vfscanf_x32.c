@@ -9,4 +9,4 @@
  * X4.26), and EMULATOR -- the other way in -- also switches the WSD layout, so it is not used.
  * Registry: libc x32_drop vfscanf.c + x32_extra this file. */
 #define __X86GCC__ 1
-#include "../../../../baseline/symbian-2010/oss.FCL.sf.os.ossrv/genericopenlibs/openenvcore/libc/src/stdio/vfscanf.c"
+#include <symbian-2010/oss.FCL.sf.os.ossrv/genericopenlibs/openenvcore/libc/src/stdio/vfscanf.c>

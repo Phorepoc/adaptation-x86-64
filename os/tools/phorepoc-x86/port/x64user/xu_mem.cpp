@@ -8,4 +8,4 @@
 // from the TU body only; every header it needs is already included (and guarded) by then.
 #include "common.h"
 #undef __GCC32__
-#include "../../../../baseline/kernelhwsrv/kernel/eka/common/mem.cpp"
+#include <kernelhwsrv/kernel/eka/common/mem.cpp>
