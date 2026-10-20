@@ -19,7 +19,7 @@
 // every page handed out here is either mapped or outside the RAM bank.
 //
 // Built -masm=intel like the rest. No kernel function may be called from here (wrong addresses
-// until the switch); no libc. docs/phorepoc/x86-64-port.md X4.4.
+// until the switch); no libc.
 
 #include <e32rom.h>
 #include <kernel/kernboot.h>

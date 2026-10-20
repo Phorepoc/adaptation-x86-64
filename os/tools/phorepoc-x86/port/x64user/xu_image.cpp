@@ -13,7 +13,7 @@
 // (common/gcchelp.cpp) already provide. Those live in xu_cxxrt.cpp, which only images ABOVE
 // euser link.
 //
-// docs/phorepoc/x86-64-port.md X4.9b (the stub's design), X4.12 (the split).
+// 9b (the stub's design), X4.12 (the split).
 
 #include "u32std.h"
 #include <e32std.h>

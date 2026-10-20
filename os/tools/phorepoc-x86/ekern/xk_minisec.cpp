@@ -11,7 +11,6 @@
 // No euser yet, so the three exec stubs below are hand-rolled. Everything lives in .utext /
 // .rodata; nothing here may touch a kernel symbol. It must never exit (the secondary is
 // system-critical): it ends in Exec::WaitForAnyRequest for ever.
-// docs/phorepoc/x86-64-port.md X4.7.
 
 typedef unsigned int TUint32;
 typedef unsigned char TUint8;

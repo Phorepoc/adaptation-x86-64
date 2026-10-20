@@ -4,12 +4,11 @@
 
 // xe_mmu.cpp -- Phorepoc amd64/x32: MMU primitives + address-space switch + the board/variant
 // symbols the kernel expects. amd64 siblings of memmodel/epoc/multiple/x86/{xmmu,xsched}.cia.
-// Surface list: docs/phorepoc/ekern-x32-backend-surface.txt. X64_TODO = honest first cut.
+// X64_TODO = honest first cut.
 //
 // NOTE (the big one): the C++ in multiple/x86/xmmu.cpp COMPILES under x32 but drives IA-32
 // 2-level page tables (4-byte PDE/PTE, 4 MiB chunks). Long mode walks 4-level tables with
 // 8-byte entries, so that file needs a real amd64 sibling before the memory model can run:
-// see docs/phorepoc/x86-64-port.md "X4.3 -- long-mode MMU layer".
 
 #include <x86_mem.h>
 #include "x64_root.h"

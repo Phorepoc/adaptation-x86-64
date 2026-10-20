@@ -8,7 +8,6 @@
 // drive 0 -> C: (DefaultLocalDrives[]) and, because DetectIRam recognises it, mounts elocal/FAT with
 // FS_FORMAT_COLD: C: is volatile, and always there (X4.17). The ATA disk (xk_ata.cpp, X4.22) is a
 // second fixed medium whose partitions take local drives 1-4 -> D:, E:, ... (DetectELocal).
-// docs/phorepoc/x86-64-port.md.
 #ifndef __VARIANTMEDIADEF_H__
 #define __VARIANTMEDIADEF_H__
 

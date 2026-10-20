@@ -5,7 +5,7 @@
 // xe_nkern.cpp -- Phorepoc amd64/x32: the nanokernel-API tail that only the FULL kernel
 // (ekern) references, so the nkernsmp-only image never needed it. amd64 siblings of
 // nkernsmp/x86/{ncutils.cpp,ncutils.cia,ncsched.cia,ncutilf.cia,ncthrd.cpp} pieces.
-// Surface list: docs/phorepoc/ekern-x32-backend-surface.txt. X64_TODO = honest first cut.
+// X64_TODO = honest first cut.
 
 // the SMP NThreadBase field aliases (iCurrent, i_NThread_Initial ...), as nkernsmp/ncthrd.cpp does (X4.64)
 #define __INCLUDE_NTHREADBASE_DEFINES__

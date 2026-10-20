@@ -7,7 +7,6 @@
 // PP::InitSuperPageFromRom -- Track B lost time on the nk_entry path that does not) plus the
 // smallest possible "PC" variant so K::InitialiseMicrokernel / A::Init1 have an Asic to talk to.
 // Runs in the HIGH half, on the initial thread stack, under the tables xboot.cpp built.
-// docs/phorepoc/x86-64-port.md X4.4.
 
 #include <x86_mem.h>
 #include <assp.h>

@@ -13,7 +13,6 @@
 # 39 of its ordinals. It is pure client-side C++ -- no asm, no arch branch -- so unlike euser
 # there is nothing here that needs an amd64 sibling.
 # efsrv.mmh: TARGETTYPE dll, UID 0x1000008d 0x100039e4, DEFFILE efsrv.def.
-# docs/phorepoc/x86-64-port.md X4.10.
 set -u
 cd /repo
 EKA=baseline/kernelhwsrv/kernel/eka

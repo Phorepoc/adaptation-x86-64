@@ -23,7 +23,7 @@
 // include order (-I port/x64mm first). SAME 32-bit linear map as IA-32 (x32 = 4 GiB of VA); only the
 // page-table GEOMETRY changes: long mode walks 8-byte entries, 512 per table. Entries stay
 // "32-bit physical address | IA-32 flag bits" in the low half (the flag layout is identical in long
-// mode); the high half (NX, physical > 4 GiB) is kept zero for now. See docs/phorepoc/x86-64-port.md X4.3.
+// mode); the high half (NX, physical > 4 GiB) is kept zero for now.
 #ifndef __MMBOOT_H__
 #define __MMBOOT_H__
 

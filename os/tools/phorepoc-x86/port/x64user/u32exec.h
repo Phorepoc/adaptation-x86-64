@@ -8,7 +8,7 @@
 // SysV x32 ABI they arrive in EDI, ESI, EDX, ECX, so each stub is a register shuffle. The kernel gate
 // preserves every register except EAX; RBX is callee-saved for our caller, so 3/4-argument stubs
 // save it. All Exec:: functions are static and every argument is 32-bit (pointers included).
-// Kernel side: tools/phorepoc-x86/ekern/xk_irq.cpp. docs/phorepoc/x86-64-port.md X4.8.
+// Kernel side: tools/phorepoc-x86/ekern/xk_irq.cpp.
 #ifndef __U32EXEC_H__
 #define __U32EXEC_H__
 #include <u32std.h>

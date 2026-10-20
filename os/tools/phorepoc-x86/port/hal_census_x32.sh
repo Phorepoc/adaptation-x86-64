@@ -15,7 +15,6 @@
 # name lives in the generic userhal.cpp, so nothing else about HAL is architecture-dependent.
 # EFILE imports HAL::Get (halu.def ordinal 1); sf_cache_man/sf_ldr/sf_utl ask it for
 # EMemoryPageSize / ECPUSpeed / EPowerGood.
-# docs/phorepoc/x86-64-port.md X4.11.
 set -u
 cd /repo
 EKA=baseline/kernelhwsrv/kernel/eka

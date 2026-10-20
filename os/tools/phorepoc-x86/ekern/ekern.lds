@@ -6,7 +6,6 @@
  *     real XIP ROM does -- the bootstrap copies it out).
  * GRUB loads by physical (LMA) address; xboot.cpp builds the page tables that make the VMAs
  * true. Non-PIC x32 code is fine above 2 GiB (32-bit addressing, R_X86_64_32) -- see
- * docs/phorepoc/x86-64-port.md X4.3.
  */
 ENTRY(_start)
 

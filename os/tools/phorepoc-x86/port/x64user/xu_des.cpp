@@ -12,7 +12,7 @@
 // the REAL va_list by type with VA_ARG and lay them out in a private block exactly the way
 // TFormatDirective::CalculateDataPointer expects, (3) doubles carry a class tag (alignment 16) because
 // size alone cannot tell a TReal from a TInt64 and they live in different save areas.
-// docs/phorepoc/x86-64-port.md X4.8c.
+// 8c.
 //
 // Copyright (c) 1994-2009 Nokia Corporation and/or its subsidiary(-ies).
 // All rights reserved.

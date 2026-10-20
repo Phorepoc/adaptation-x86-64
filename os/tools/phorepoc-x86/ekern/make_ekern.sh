@@ -8,7 +8,6 @@
 # at EKA2's native linear addresses (ekern.lds). Repo at /repo, output in /out/ekern.
 #   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/ekern/make_ekern.sh [run]
-# docs/phorepoc/x86-64-port.md X4.4.
 set -eu
 cd /repo
 SRC=tools/phorepoc-x86

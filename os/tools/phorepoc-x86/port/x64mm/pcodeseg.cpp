@@ -1,7 +1,6 @@
 // PHOREPOC amd64 (x32 ABI) sibling of memmodel/epoc/pcodeseg.cpp -- a COPY of the 2010 baseline
 // file with the one delta marked "PHOREPOC X4.44:" (FindRomCode no longer hands the loader a ROM code
 // segment whose load FAILED). Built INSTEAD of the baseline TU (port/ekern_census_x32.sh).
-// docs/phorepoc/x86-64-port.md X4.44.
 //
 // Copyright (c) 1995-2009 Nokia Corporation and/or its subsidiary(-ies).
 // All rights reserved.

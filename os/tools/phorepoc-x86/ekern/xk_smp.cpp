@@ -10,7 +10,6 @@
 // iMain(info) on that stack, in the kernel's address space, in a state equivalent to the boot CPU's.
 // ApMainGeneric then does NKern::Init -> NThread::Create(initial) (the subscheduler comes to life),
 // M::Init2AP, A::Init2AP (-> our variant starts this CPU's tick) and idles.
-// docs/phorepoc/x86-64-port.md X4.6.
 
 #include <x86_mem.h>
 #include "../port/x64ekern/x64_root.h"

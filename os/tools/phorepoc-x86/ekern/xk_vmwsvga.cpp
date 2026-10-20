@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: EPL-1.0
 
-// xk_vmwsvga.cpp -- Path C (2026-10-16): rungs S0 + S1 of docs/phorepoc/vm-gpu-options.md. The VMware SVGA II / SVGA3D PCI device
+// xk_vmwsvga.cpp -- Path C (2026-10-16): rungs S0 + S1 of. The VMware SVGA II / SVGA3D PCI device
 // (15AD:0405) -- what VMware Workstation exposes and what VirtualBox's `--graphicscontroller vmsvga` emulates (with
 // `--accelerate3d on` the 3D command set behind it).
 //

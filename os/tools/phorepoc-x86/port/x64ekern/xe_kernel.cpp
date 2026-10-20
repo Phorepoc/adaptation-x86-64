@@ -6,7 +6,7 @@
 // the IA-32 MSVC-asm files kernel/x86/{ckernel,cexec,cutils,csched}.cia + klib/x86/cumem.cia.
 // C++ wherever the original was asm only for speed; naked asm only where register state IS the
 // semantics (the exception traps, the drop to ring 3). Built -masm=intel like the baseline TUs.
-// Surface list: docs/phorepoc/ekern-x32-backend-surface.txt. X64_TODO = honest first cut.
+// X64_TODO = honest first cut.
 
 #include <x86_mem.h>
 #include <u32std.h>

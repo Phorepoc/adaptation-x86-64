@@ -15,7 +15,6 @@
 #   atomics.cia -> x64smp/x64s_atomics.cpp (shared with the kernel)   cmem.cia -> generic common/mem.cpp
 #   uc_realx.cia (3348 lines of TRealX asm) -> xu_realx.cpp (portable integer C++, hosted test realx_test.cpp)
 #   uc_seh.cpp = Win32 SEH, n/a.
-# docs/phorepoc/x86-64-port.md X4.8.
 set -u
 cd /repo
 EKA=baseline/kernelhwsrv/kernel/eka

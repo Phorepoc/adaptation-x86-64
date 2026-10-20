@@ -12,7 +12,6 @@
 //   - the tick: this CPU's local-APIC timer, PIT-calibrated to MsTickPeriod (1 ms), drives the real
 //     NTimerQ::Tick() and ages the running thread's timeslice (iTime is in these ticks:
 //     NKern::TimesliceTicks with iTimerMax = 1000/s, see xk_entry.cpp TheVib).
-// docs/phorepoc/x86-64-port.md X4.5.
 
 #include <x86_mem.h>
 #include "xk_interrupt.h"

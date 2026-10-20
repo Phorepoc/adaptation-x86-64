@@ -1,7 +1,7 @@
 // PHOREPOC amd64 (x32 ABI) sibling of memmodel/epoc/flexible/mmu/x86/xmmu.cpp -- a COPY of the 2010
 // baseline file with the minimum deltas long mode needs, each marked "PHOREPOC x64:". Built INSTEAD of
 // the baseline TU (port/ekern_census_x32.sh). Geometry itself lives in the shadowed headers
-// (mmboot.h, mmtypes.h); see docs/phorepoc/x86-64-port.md X4.3.
+// (mmboot.h, mmtypes.h);.
 //
 // Copyright (c) 1997-2009 Nokia Corporation and/or its subsidiary(-ies).
 // All rights reserved.

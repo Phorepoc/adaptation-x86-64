@@ -22,7 +22,6 @@
 #   sfat32/ on the path for <filesystem_fat.h>; halservices for <hal.h>
 # ARCH DELTA vs the ARM list: kernel/byte_pair.cpp (the portable C++ #else arm) replaces
 # kernel/arm/byte_pair.cia, which is hand-written ARM naked asm.
-# docs/phorepoc/x86-64-port.md X4.10.
 set -u
 cd /repo
 EKA=baseline/kernelhwsrv/kernel/eka

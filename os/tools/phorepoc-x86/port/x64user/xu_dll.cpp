@@ -20,7 +20,7 @@
 // an absent ordinal (the EKDATA trap, Track-B M7.5).
 //
 // ENTRY REASON arrives in EDI (SysV x32), not on the stack as it did on IA-32.
-// docs/phorepoc/x86-64-port.md X4.9b.
+// 9b.
 
 #include "u32std.h"
 #include <e32std.h>

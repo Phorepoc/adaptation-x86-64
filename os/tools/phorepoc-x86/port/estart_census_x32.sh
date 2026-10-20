@@ -20,7 +20,7 @@
 #   -iquote for the fileserver's own inc/ (the KERNEL's common.h otherwise shadows it)
 #   -DSYMBIAN_ENABLE_64_BIT_FILE_SERVER_API (variant-wide in the real build)
 #   -fno-access-control (f32 headers make members private that friends then name)
-# docs/phorepoc/x86-64-port.md "Next rungs" item 1.5.
+# item 1.5.
 set -u
 cd /repo
 EKA=baseline/kernelhwsrv/kernel/eka

@@ -1,7 +1,7 @@
 /* Copyright The Phorepoc Authors
  * SPDX-License-Identifier: EPL-1.0 */
 
-// rvmwsvgachannel.h -- OURS (docs/phorepoc/vm-gpu-options.md S2): the user-side API of the VMware SVGA II / SVGA3D kernel driver
+// rvmwsvgachannel.h -- OURS: the user-side API of the VMware SVGA II / SVGA3D kernel driver
 // (tools/phorepoc-x86/ekern/xk_vmwsvga.cpp, built into ekern, device "VmwSvga"). The Symbian counterpart of the DRM_VMW_* ioctls the Mesa
 // `svga` winsys uses, in the shape of RMaliChannel:
 //   GetInfo   -> the device (SVGA_ID, CAPABILITIES, CAP2, the 3D devcaps that matter: 3D / DXCONTEXT / SM41 / SM5 / GL43 / max texture)
