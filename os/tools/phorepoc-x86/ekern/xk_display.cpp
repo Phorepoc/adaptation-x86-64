@@ -52,6 +52,9 @@ static TInt ScreenPitch();
 #define XK_SCALE 0
 #endif
 TInt X64ScreenW, X64ScreenH;				// what the HAL reports (the i8042 mouse area follows it)
+// The shadow screen's words per line: rows padded to 64 bytes, as the real S^3 hardware lays them out (the 701's HAL
+// reports 1472 bytes for its 360-px rows); games that write ScreenInfo memory assume that stride (SkyForce: 368 px)
+static inline TInt ScreenWpl() { return (X64ScreenW + 15) & ~15; }
 TInt X64Scale = 1;							// framebuffer pixels per screen pixel, each way
 TInt X64ScreenOx, X64ScreenOy;				// framebuffer pixel of the screen's (0,0)
 TInt X64FbW, X64FbH;						// the framebuffer, in its own pixels
@@ -265,7 +268,7 @@ static inline TUint32 ScreenPixelAt(TInt aX, TInt aY)
 	if (x < 0 || y < 0)
 		return 0;
 	const TInt sx = x / X64Scale, sy = y / X64Scale;
-	return (sx < X64ScreenW && sy < X64ScreenH) ? TheScreen[sy*X64ScreenW + sx] : 0;
+	return (sx < X64ScreenW && sy < X64ScreenH) ? TheScreen[sy*ScreenWpl() + sx] : 0;
 	}
 
 // the cursor rectangle at framebuffer (aX,aY), clipped: the arrow, or (aDraw false) what is under it
@@ -296,7 +299,7 @@ static void FlushDfcFn(TAny*)
 	TBool underCursor = EFalse;
 	for (TInt y=0; y<X64ScreenH; ++y)
 		{
-		const TUint32* src = TheScreen + y*w;
+		const TUint32* src = TheScreen + y*ScreenWpl();
 		TUint32* m = TheMirror + y*w;
 		TInt first = 0, last = w - 1;
 		while (first <= last && src[first] == m[first])
@@ -341,7 +344,7 @@ static void FlushDfcFn(TAny*)
 
 static TInt StartShadow()
 	{
-	const TInt size = (X64ScreenW * X64ScreenH * 4 + 0xFFF) & ~0xFFF;
+	const TInt size = (ScreenWpl() * X64ScreenH * 4 + 0xFFF) & ~0xFFF;
 	TPhysAddr phys;
 	TInt r = Epoc::AllocPhysicalRam(size, phys);
 	if (r == KErrNone)
@@ -372,7 +375,7 @@ static TLinAddr ScreenAddress()
 	}
 static TInt ScreenPitch()
 	{
-	return TheScreenChunk ? X64ScreenW * 4 : TheFb.iPitch;
+	return TheScreenChunk ? ScreenWpl() * 4 : TheFb.iPitch;
 	}
 
 // ---- X4.35: mode setting, Bochs VBE "DISPI" -------------------------------------------------------------
@@ -462,7 +465,7 @@ static void ModeDfcFn(TAny*)
 	memclr((TAny*)TheFbChunk->LinearAddress(), TheFb.iPitch * TheFb.iHeight);
 	const TInt n = X64ScreenW * X64ScreenH;			// the mirror no longer matches: redraw everything
 	for (TInt i=0; i<n; ++i)
-		TheMirror[i] = ~TheScreen[i];
+		TheMirror[i] = ~TheScreen[(i / X64ScreenW) * ScreenWpl() + i % X64ScreenW];
 	TheDrawnX = TheDrawnY = -1;						// the cursor's saved background is gone too
 	Kern::Printf("[display] host resize: %dx%d asked -> framebuffer %dx%d, screen x%d at (%d,%d)",
 					TheReqW, TheReqH, X64FbW, X64FbH, X64Scale, X64ScreenOx, X64ScreenOy);
