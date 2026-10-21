@@ -8,15 +8,19 @@
 # (zero unresolved). The SMP analogue of build_nkern_probe.sh's link self-check.
 # Runs inside the phorepoc-x86 Docker image (repo at /repo).
 set -eu
-cd /repo
-EKA=baseline/kernelhwsrv/kernel/eka
+# Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the
+# relative paths below hang off (the merged OS tree), KOUT = output, KHS = kernelhwsrv, KINC = the kernel include shims.
+KVIEW="${KVIEW:-/repo}"; KOUT="${KOUT:-/out}"
+KHS="${KHS:-baseline/kernelhwsrv}"; KINC="${KINC:-toolchain/kinc}"
+export KVIEW KOUT KHS KINC; cd "$KVIEW"
+EKA=$KHS/kernel/eka
 PORT=tools/phorepoc-x86/port
 SMP=$PORT/x64smp
 # x32 (long mode, 32-bit pointers) is THE Path C ABI (user decision 2026-09-20): EKA2's
 # compile-time size/offset asserts stay ON. ABI=-m64 keeps the LP64 fallback building
 # (needs -fpermissive + relax_size_asserts.h).
 ABI="${ABI:--mx32}"
-OUT="${NOUT:-/out/nkernsmp}"
+OUT="${NOUT:-$KOUT/nkernsmp}"
 if [ "$ABI" = "-mx32" ]; then PERMISSIVE=""; LDEMU="-m elf32_x86_64"; RELAX=""
 else PERMISSIVE="-fpermissive"; LDEMU=""; RELAX="-include tools/phorepoc-x86/port/x64smp/relax_size_asserts.h"; fi
 mkdir -p "$OUT"

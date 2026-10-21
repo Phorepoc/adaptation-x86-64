@@ -13,13 +13,17 @@
 #   LINK=1: keep objects (only the TUs ekern.mmp really lists), ld -r them with the nkernsmp
 #           set from make_smp.sh and print the UNDEFINED symbols = the ekern backend surface.
 set -u
-cd /repo
-EKA=baseline/kernelhwsrv/kernel/eka
+# Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the
+# relative paths below hang off (the merged OS tree), KOUT = output, KHS = kernelhwsrv, KINC = the kernel include shims.
+KVIEW="${KVIEW:-/repo}"; KOUT="${KOUT:-/out}"
+KHS="${KHS:-baseline/kernelhwsrv}"; KINC="${KINC:-toolchain/kinc}"
+export KVIEW KOUT KHS KINC; cd "$KVIEW"
+EKA=$KHS/kernel/eka
 PORT=tools/phorepoc-x86/port
 MM="${MM:-multiple}"; SMP="${SMP:-1}"
 ABI="${ABI:--mx32}"
 if [ "$ABI" = "-m64" ]; then SFX="-lp64"; ABIX="-fpermissive"; RELAX="-include $PORT/x64smp/relax_size_asserts.h"; else SFX=""; ABIX=""; RELAX=""; fi
-OUT="/out/ekern-census-$MM$SFX"; mkdir -p "$OUT"
+OUT="$KOUT/ekern-census-$MM$SFX"; mkdir -p "$OUT"
 # LP64: -fpermissive turns "cast loses precision" into a WARNING, so warnings are the real signal there.
 if [ "$ABI" = "-m64" ]; then WARN="-Wno-all -Wno-invalid-offsetof -Wno-return-local-addr -Wno-deprecated -Wno-attributes"; else WARN="-w"; fi
 
@@ -59,7 +63,7 @@ DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D__KERNEL_MODE__ -D_
 # path (<kernel/heap_hybrid.h>) or GENERATES (exec_enum.h from execs.txt). Arch-neutral.
 INCS="$NK -I $EKA/include -I $EKA/include/kernel -I $EKA/include/kernel/x86 \
       -I $EKA/include/memmodel/epoc $MMINC -I $EKA/memmodel/epoc -I $EKA/klib -I $EKA/common \
-      -I baseline/kernelhwsrv/halservices/hal/inc -I toolchain/kinc -I toolchain/kinc/kernel -I $PORT"
+      -I $KHS/halservices/hal/inc -I $KINC -I $KINC/kernel -I $PORT"
 PRE="-include $PORT/port_prelude.h -include e32def.h $RELAX"
 
 TUS="$(cd $EKA && ls kernel/*.cpp kernel/x86/*.cpp klib/*.cpp klib/x86/*.cpp 2>/dev/null)
@@ -111,7 +115,7 @@ ls $EKA/kernel/x86/*.cia $EKA/klib/x86/*.cia $EKA/common/x86/*.cia $EKA/memmodel
   | wc -l | sed 's/^/MSVC-_asm .cia files NOT attempted (need x64 siblings): /'
 
 if [ "$LINK" = 1 ]; then
-  NK=/out/nkernsmp
+  NK=$KOUT/nkernsmp
   echo "--- amd64 ekern backend (port/x64ekern) ---"
   for b in $PORT/x64ekern/*.cpp; do
     n=$(basename "$b" .cpp)

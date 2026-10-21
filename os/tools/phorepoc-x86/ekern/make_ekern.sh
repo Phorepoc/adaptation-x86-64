@@ -5,16 +5,21 @@
 # make_ekern.sh -- IN-CONTAINER build of the Phorepoc amd64/x32 image that boots the REAL EKA2
 # kernel (ekern + flexible memory model + nkernSMP + our amd64 backends), not the nanokernel
 # demo (make_smp.sh). One multiboot2 ELF: low boot stub (boot.S + xboot.cpp) + the kernel image
-# at EKA2's native linear addresses (ekern.lds). Repo at /repo, output in /out/ekern.
+# at EKA2's native linear addresses (ekern.lds). Tree at $KVIEW (default /repo), output in $KOUT/ekern (default /out).
 #   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/ekern/make_ekern.sh [run]
 set -eu
-cd /repo
+# Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the
+# relative paths below hang off (the merged OS tree), KOUT = output, KHS = kernelhwsrv, KINC = the kernel include shims.
+KVIEW="${KVIEW:-/repo}"; KOUT="${KOUT:-/out}"
+KHS="${KHS:-baseline/kernelhwsrv}"; KINC="${KINC:-toolchain/kinc}"
+export KVIEW KOUT KHS KINC; cd "$KVIEW"
+KROM="${KROM:-$KOUT/rom/romsect.bin}"   # the ROM section to carry
 SRC=tools/phorepoc-x86
 PORT=$SRC/port
 EK=$SRC/ekern
-EKA=baseline/kernelhwsrv/kernel/eka
-OUT=/out/ekern
+EKA=$KHS/kernel/eka
+OUT=$KOUT/ekern
 mkdir -p "$OUT"
 
 # X4.53: steps 1-2 (nkern + the ekern census, the slow part) are skipped when nothing they compile has
@@ -26,14 +31,14 @@ KSTAMP=$OUT/kernel-objs.stamp
 # the key; walking all of kernelhwsrv through the Windows bind mount for a -newer test cost ~7 s per run
 git_head() { local g="$1/.git" h; h=$(cat "$g/HEAD" 2>/dev/null); case "$h" in "ref: "*) cat "$g/${h#ref: }" 2>/dev/null \
   || grep -m1 " ${h#ref: }\$" "$g/packed-refs" 2>/dev/null | cut -d' ' -f1;; *) echo "$h";; esac; }
-KKEY="UB=${UARTBATCH:-0} DBG=${DBG:-1} FAIL_DLLDATA=${FAIL_DLLDATA:-} KHS=$(git_head baseline/kernelhwsrv)"
-if [ "${KCLEAN:-0}" != 1 ] && [ -f "$KSTAMP" ] && [ "$(cat "$KSTAMP")" = "$KKEY" ] && [ -d /out/ekern-census-flexible/obj ] \
-   && [ -z "$(find "$PORT" "$EK" toolchain/kinc -newer "$KSTAMP" -type f 2>/dev/null | head -1)" ]; then
+KKEY="UB=${UARTBATCH:-0} DBG=${DBG:-1} FAIL_DLLDATA=${FAIL_DLLDATA:-} KHS=$(git_head $KHS)"
+if [ "${KCLEAN:-0}" != 1 ] && [ -f "$KSTAMP" ] && [ "$(cat "$KSTAMP")" = "$KKEY" ] && [ -d $KOUT/ekern-census-flexible/obj ] \
+   && [ -z "$(find -L "$PORT" "$EK" "$KINC" -newer "$KSTAMP" -type f 2>/dev/null | head -1)" ]; then
   echo "[1-2/5] nkernSMP + ekern objects: unchanged since the last build ($KKEY) -- reused"
 else
 rm -f "$KSTAMP"; echo "$KKEY" > "$KSTAMP.new"
 echo "[1/5] nkernSMP neutral core + amd64 SMP backend (x32)"
-ABI=-mx32 NOUT=/out/nkernsmp bash "$PORT/build_nkernsmp_link.sh" >"$OUT/nkernsmp.log" 2>&1 \
+ABI=-mx32 NOUT=$KOUT/nkernsmp bash "$PORT/build_nkernsmp_link.sh" >"$OUT/nkernsmp.log" 2>&1 \
   || { tail -20 "$OUT/nkernsmp.log"; exit 1; }
 
 echo "[2/5] ekern + flexible memory model + x64ekern backend (objects via the census, LINK=1)"
@@ -46,10 +51,10 @@ grep -q "^  FAIL " "$OUT/census.log" && { grep -A3 "^  FAIL " "$OUT/census.log" 
 mv "$KSTAMP.new" "$KSTAMP"
 fi
 # the only symbols the kernel objects may still want are the ones xk_entry.cpp (and xk_threaddump.cpp: X64_CrashWho) supply
-if grep -v -x -e "DebugOutputChar(unsigned int)" -e "KPrintf(char const\*, ...)" -e __code_base -e __utext_base -e X64_CrashWho /out/ekern-census-flexible/undefined.txt | grep -q .; then
-  echo "unexpected undefined symbols:"; head -20 /out/ekern-census-flexible/undefined.txt; exit 1
+if grep -v -x -e "DebugOutputChar(unsigned int)" -e "KPrintf(char const\*, ...)" -e __code_base -e __utext_base -e X64_CrashWho $KOUT/ekern-census-flexible/undefined.txt | grep -q .; then
+  echo "unexpected undefined symbols:"; head -20 $KOUT/ekern-census-flexible/undefined.txt; exit 1
 fi
-KOBJ=/out/ekern-census-flexible/obj
+KOBJ=$KOUT/ekern-census-flexible/obj
 
 echo "[3/5] boot stub + bootstrap + kernel entry / vectors / static variant"
 CXX="gcc -mx32 -ffreestanding -fno-pic -fno-pie -fno-stack-protector -nostdinc -std=gnu++03 \
@@ -76,7 +81,7 @@ INCS="-I $PORT/x64smp -I $EKA/include/nkernsmp -I $EKA/include/nkernsmp/x86 -I $
       -I $PORT/x64mm -I $EKA/include/memmodel/epoc/flexible -I $EKA/include/memmodel/epoc/flexible/x86 \
       -I $EKA/memmodel/epoc/flexible -I $EKA/memmodel/epoc/flexible/mmu -I $EKA/memmodel/epoc/flexible/mmu/x86 \
       -I $EKA/include/memmodel/epoc/mmubase -I $EKA/memmodel/epoc/mmubase -I $EKA/memmodel/epoc \
-      -I $EKA/klib -I $EKA/common -I toolchain/kinc -I toolchain/kinc/kernel -I $PORT"
+      -I $EKA/klib -I $EKA/common -I $KINC -I $KINC/kernel -I $PORT"
 PRE="-include $PORT/port_prelude.h -include e32def.h"
 # X4.68: step 3's objects depend only on the knobs (DEFS, FBDEF), the pinned kernel (KKEY) and our own port sources;
 # a run that changes none of them (every app-debug iteration: only the ROM changes) reuses them. The ROM image
@@ -84,7 +89,7 @@ PRE="-include $PORT/port_prelude.h -include e32def.h"
 OSTAMP=$OUT/image-objs.stamp
 OKEY="$DEFS|$FBDEF|$KKEY|snd${SOUND_TEST:-}"
 OBJS_OK=0
-if [ "${KCLEAN:-0}" != 1 ] && [ -f "$OSTAMP" ] && [ "$(cat "$OSTAMP")" = "$OKEY" ]    && [ -z "$(find "$PORT" "$EK" "$SRC/boot.S" "$SRC/grub.cfg" toolchain/kinc -newer "$OSTAMP" -type f 2>/dev/null | head -1)" ]; then
+if [ "${KCLEAN:-0}" != 1 ] && [ -f "$OSTAMP" ] && [ "$(cat "$OSTAMP")" = "$OKEY" ]    && [ -z "$(find -L "$PORT" "$EK" "$SRC/boot.S" "$SRC/grub.cfg" "$KINC" -newer "$OSTAMP" -type f 2>/dev/null | head -1)" ]; then
   echo "[3/5] boot stub + port objects: unchanged -- reused"; OBJS_OK=1
 fi
 if [ "$OBJS_OK" = 0 ]; then
@@ -108,12 +113,12 @@ case "${SECONDARY:-uexe}" in
 uexe)
   bash "$SRC/uexe/make_uexe.sh" > "$OUT/uexe.log" 2>&1 || { tail -15 "$OUT/uexe.log"; exit 1; }
   sed "s/^/      /" "$OUT/uexe.log"
-  gcc -mx32 -fno-pic -DUIMAGE_BIN='"/out/uexe/uexe.bin"' -c "$EK/xk_uimage.S" -o "$OUT/xk_uimage.o"
+  gcc -mx32 -fno-pic -DUIMAGE_BIN="\"$KOUT/uexe/uexe.bin\"" -c "$EK/xk_uimage.S" -o "$OUT/xk_uimage.o"
   ;;
 rom)
-  [ -f /out/rom/romsect.bin ] || { echo "SECONDARY=rom: /out/rom/romsect.bin missing -- build it on the host (see above)"; exit 1; }
-  ls -l /out/rom/romsect.bin
-  [ "$OBJS_OK" = 1 ] && [ -f "$OUT/xk_uimage.o" ] && [ ! /out/rom/romsect.bin -nt "$OUT/xk_uimage.o" ]     || gcc -mx32 -fno-pic -DUIMAGE_BIN='"/out/rom/romsect.bin"' -c "$EK/xk_uimage.S" -o "$OUT/xk_uimage.o"
+  [ -f "$KROM" ] || { echo "SECONDARY=rom: $KROM missing -- build it on the host (see above)"; exit 1; }
+  ls -l "$KROM"
+  [ "$OBJS_OK" = 1 ] && [ -f "$OUT/xk_uimage.o" ] && [ ! "$KROM" -nt "$OUT/xk_uimage.o" ]     || gcc -mx32 -fno-pic -DUIMAGE_BIN="\"$KROM\"" -c "$EK/xk_uimage.S" -o "$OUT/xk_uimage.o"
   ;;
 *)
   gcc -mx32 -fno-pic -c "$EK/xk_uimage.S" -o "$OUT/xk_uimage.o"
@@ -143,7 +148,7 @@ $CXX $DEFS $INCS $MED $PRE -c "$EK/xk_media.cpp" -o "$OUT/xk_media.o"
 $CXX $DEFS $INCS $MED $PRE -c "$EK/xk_ata.cpp" -o "$OUT/xk_ata.o"
 # X4.18: the board's display HAL (VGA text) and PC keyboard (i8042). The keyboard reuses Syborg's
 # PC-set-1 -> EStdKey table, cut verbatim out of syborg_keyboard.h (its initializer braces only).
-KBDH=baseline/symbian-2010/oss.FCL.sf.adapt.Qemu/baseport/syborg/keyboard/syborg_keyboard.h
+KBDH="${KQEMU:-baseline/symbian-2010/oss.FCL.sf.adapt.Qemu}"/baseport/syborg/keyboard/syborg_keyboard.h
 awk '/KConvertCode\[\] *=/{on=1;next} on&&/^ *};/{print "}";exit} on{print}' "$KBDH" > "$OUT/xk_kbdtable.inc"
 [ "$(grep -c "EStdKey" "$OUT/xk_kbdtable.inc")" -gt 50 ] || { echo "keyboard table extraction failed"; exit 1; }
 $CXX $DEFS $INCS $PRE -c "$EK/xk_display.cpp" -o "$OUT/xk_display.o"
@@ -185,7 +190,7 @@ if [ "${KCLEAN:-0}" != 1 ] && [ -f "$LSTAMP" ] && [ "$(cat "$LSTAMP")" = "$LKEY"
 else
 rm -f "$LSTAMP"
 echo "[4/5] link at EKA2's native addresses"
-NK=/out/nkernsmp
+NK=$KOUT/nkernsmp
 ld -m elf32_x86_64 -n -z max-page-size=0x1000 -T "$EK/ekern.lds" -Map "$OUT/ekern.map" -o "$OUT/ekern.elf32" \
    "$OUT/boot.o" "$OUT/xboot.o" "$OUT/xk_entry.o" "$OUT/xk_irq.o" "$OUT/xk_smp.o" "$OUT/ncirq.o" "$OUT/xk_interrupt.o" "$OUT/xk_aptramp.o" "$OUT/xk_minisec.o" "$OUT/xk_uimage.o" "$OUT/exstart.o" "$OUT/xk_vectors.o" \
    "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_vmwsvga.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
@@ -231,10 +236,10 @@ if [ "${1:-}" = "run" ]; then
   fi
   # RTC=<date> (e.g. 2026-12-01T12:00:00): start the guest CMOS clock there (DST checks, X4.41)
   # DISK=1: the test hard disk (tools/phorepoc-x86/make_disk.sh) as the primary IDE master -> D: (X4.22)
-  DRIVE=""; [ "${DISK:-0}" = 1 ] && DRIVE="-drive file=${DISKIMG:-/out/disk/phorepoc-disk.img},format=raw,if=ide,index=0"
+  DRIVE=""; [ "${DISK:-0}" = 1 ] && DRIVE="-drive file=${DISKIMG:-$KOUT/disk/phorepoc-disk.img},format=raw,if=ide,index=0"
   # CARD=1 (X4.111): the memory card = a second disk on the primary IDE SLAVE (index 1; the ISO is index 2, secondary master).
   # Symbian sees a removable drive, F: (make_disk.sh: IMG=/out/disk/phorepoc-card.img LABEL="MEMORY CARD" bash make_disk.sh 64)
-  [ "${CARD:-0}" = 1 ] && DRIVE="$DRIVE -drive file=${CARDIMG:-/out/disk/phorepoc-card.img},format=raw,if=ide,index=1"
+  [ "${CARD:-0}" = 1 ] && DRIVE="$DRIVE -drive file=${CARDIMG:-$KOUT/disk/phorepoc-card.img},format=raw,if=ide,index=1"
   # NETOPTS=<slirp options> (X4.49): the NIC spelled out (QEMU's default is this same e1000 on user
   # networking) with extra options, e.g. NETOPTS=dhcpstart=10.0.2.77 to see a DHCP lease differ from
   # the static IAP's 10.0.2.15
