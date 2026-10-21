@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 /* x64s_ncutils.cpp -- Phorepoc amd64 SMP arch backend: the low-level, per-CPU
  * NKern CPU primitives the arch-neutral nkernSMP core references. The SMP

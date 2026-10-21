@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # build_nkernsmp_probe.sh -- IN-CONTAINER: SMP slice 2b probe. Try to compile the
 # arch-NEUTRAL nkernsmp source (the SMP nanokernel: per-CPU TSubScheduler, SMP

@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* exctrap_test.c -- hosted run-test of the TExcTrap register save/resume sequences
  * (xe_exctrap_asm.h), the same way ctxsw_test.c proved the context switch. Hosted = LP64

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # build_sched_test.sh -- IN-CONTAINER: cooperative scheduling on the REAL EKA2
 # nkern (amd64). Builds the neutral nkern + amd64 backend (via the probe), then

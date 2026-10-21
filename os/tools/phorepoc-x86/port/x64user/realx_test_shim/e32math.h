@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 // e32math.h -- HOSTED TEST SHIM (realx_test.cpp only; never on the euser include path).
 // Reproduces exactly the TRealX class of baseline .../eka/include/e32math.h (member order, types,

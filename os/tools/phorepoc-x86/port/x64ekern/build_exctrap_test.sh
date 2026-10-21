@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # build_exctrap_test.sh -- HOST driver: build + run the hosted TExcTrap save/resume test in the
 # phorepoc-x86 image (both -O0 and -O2: register allocation differs, both must pass).

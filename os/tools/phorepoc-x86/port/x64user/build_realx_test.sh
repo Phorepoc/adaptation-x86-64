@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # build_realx_test.sh -- IN-CONTAINER, hosted: build + run realx_test.cpp against the REAL
 # xu_realx.cpp (unmodified; only <e32math.h> is the class-layout shim in realx_test_shim/), at

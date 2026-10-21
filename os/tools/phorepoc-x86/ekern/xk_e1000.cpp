@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // xk_e1000.cpp -- the Phorepoc amd64 board's network card: Intel 8254x "e1000". X4.47.
 //

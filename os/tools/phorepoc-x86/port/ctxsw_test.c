@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* ctxsw_test.c -- unit test for the Phorepoc amd64 context switch primitive
  * (x64_ctxsw.S). Cooperative ping-pong: a main context creates two "threads",

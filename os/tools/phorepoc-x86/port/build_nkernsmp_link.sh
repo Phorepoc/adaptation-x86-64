@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # build_nkernsmp_link.sh -- IN-CONTAINER: SMP slice 2b step 2 LINK probe. Compile
 # the arch-NEUTRAL nkernsmp core UNMODIFIED for amd64 AND our amd64 SMP backend

@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 // u32exec.h -- Phorepoc amd64/x32: SHADOWS include/u32exec.h (this directory is first on the user
 // include path). Same contract as the IA-32 branch of the original -- the executive gate is EKA2's

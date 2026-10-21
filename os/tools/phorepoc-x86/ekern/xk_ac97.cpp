@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // xk_ac97.cpp -- Path C (X4.88): Intel AC'97 audio (ICH 82801AA, PCI 8086:2415 -- what QEMU `-device AC97` and
 // VirtualBox `--audio-controller ac97` emulate) as a SOUND PDD under the REAL shared-chunk sound LDD

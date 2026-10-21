@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* stdarg_e.h -- Path C x32 override of ESTLIB's epoc32/include/libc/stdarg_e.h (X4.41).
  *

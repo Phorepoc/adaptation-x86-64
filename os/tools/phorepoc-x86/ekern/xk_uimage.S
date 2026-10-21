@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* xk_uimage.S -- Phorepoc amd64/x32 kernel image: carries the statically linked user EXE
  * (tools/phorepoc-x86/uexe/, flat binary linked for ROM linear 0x80400000) inside the ROM.

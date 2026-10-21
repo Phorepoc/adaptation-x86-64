@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # make_ekern.sh -- IN-CONTAINER build of the Phorepoc amd64/x32 image that boots the REAL EKA2
 # kernel (ekern + flexible memory model + nkernSMP + our amd64 backends), not the nanokernel

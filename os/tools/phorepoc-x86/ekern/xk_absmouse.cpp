@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // xk_absmouse.cpp -- the Phorepoc amd64 board's ABSOLUTE pointer: "mouse integration". X4.35.
 //

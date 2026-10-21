@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 # build_atomics_test.sh -- IN-CONTAINER, hosted: build + run atomics_test.cpp against the REAL
 # x64s_atomics.cpp (unmodified; only <e32def.h> is the shim in atomics_test_shim/), at -O2 and

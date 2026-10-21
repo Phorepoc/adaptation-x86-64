@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // xk_threaddump.cpp -- Path C debug aid: a one-shot dump of every thread, N seconds after boot (X4.27).
 //
