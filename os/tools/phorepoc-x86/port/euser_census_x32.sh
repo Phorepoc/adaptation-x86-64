@@ -30,7 +30,8 @@ CXX="gcc -mx32 -ffreestanding -fno-pic -fno-stack-protector -nostdinc -std=gnu++
 # language selection (ssmlangselcmd) failed the boot
 DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D_UNICODE -D__DLL__ -DSYMBIAN_DISTINCT_LOCALE_MODEL ${EXTRA_DEFS:-}"
 # port/x64user first: amd64 siblings of user-side arch headers (u32exec.h exec stubs)
-INCS="-I toolchain/overlay -I $PORT/x64user -I $EKA/include -I $EKA/euser -I $EKA/euser/unicode -I $EKA/common \
+# (-idirafter baseline: the Symbian root, for <kernelhwsrv/...> includes of our port files, as every component has it)
+INCS="-idirafter baseline -I toolchain/overlay -I $PORT/x64user -I $EKA/include -I $EKA/euser -I $EKA/euser/unicode -I $EKA/common \
       -I baseline/kernelhwsrv/halservices/hal/inc -I toolchain/kinc -I toolchain/generated -I $PORT"
 PRE="-include $PORT/port_prelude.h -include e32def.h"
 # LINK=1: publish the exact compile line so emitter/build_euser_x32.py builds its own TUs
