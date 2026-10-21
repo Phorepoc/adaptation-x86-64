@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-1.0 */
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
 
 /* libc_vfscanf_x32.c -- Path C (amd64/x32): the P.I.P.S. libc vfscanf.c, UNMODIFIED, compiled with the
  * branch the source keeps for x86 GCC builds. Its positional-"%n$" code knows two va_list layouts: the

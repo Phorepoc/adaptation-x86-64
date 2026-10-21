@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xk_irq.cpp -- Phorepoc amd64/x32 kernel image: interrupt entry/exit and the system tick.
 // amd64 sibling of the interrupt half of nkernsmp/x86/vectors.cia + the IA-32 variant's timer:

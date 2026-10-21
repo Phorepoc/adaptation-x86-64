@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-1.0
+# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 # make_disk.sh -- IN-CONTAINER: the Path C test hard disk (X4.22). A raw image with an MBR and one FAT32
 # primary partition (type 06, from sector 2048), formatted with mtools, a README on it. The kernel's ATA

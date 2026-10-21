@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_exec.cpp -- Phorepoc amd64/x32 euser: sibling of euser/epoc/x86/uc_exec.cia.
 // Emits the whole generated user-side executive layer (exec_user.h: Exec::, E32Loader::, UserSvr::

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-1.0
+# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 # build_ctxsw_test.sh -- IN-CONTAINER: build + run the amd64 context-switch unit
 # test (the core of TScheduler::Reschedule). Hosted Linux binary, so it actually

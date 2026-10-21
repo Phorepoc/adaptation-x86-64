@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xk_display.cpp -- the Phorepoc amd64 board's display HAL (EHalGroupDisplay). X4.18.
 // Ours: the 2010 drop has no x86 baseport, so this is the board side of a contract whose user

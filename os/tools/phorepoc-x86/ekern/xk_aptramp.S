@@ -1,6 +1,6 @@
 /* Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
  * Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-1.0 */
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
 
 /* xk_aptramp.S -- Phorepoc amd64/x32 kernel image: the application-processor start-up trampoline.
  * Kernel-image sibling of the nanokernel demo's smp.S (and of what nkernsmp/x86/nccpu.cpp builds in

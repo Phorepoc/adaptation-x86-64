@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_leavetrace.cpp -- opt-in bring-up diagnostic: log every User::Leave that crosses a module
 // boundary (the x32 sibling of toolchain/euser_dll/leave_trace_dev.cpp). X4.19.

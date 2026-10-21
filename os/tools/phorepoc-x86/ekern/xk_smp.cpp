@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xk_smp.cpp -- Phorepoc amd64/x32 kernel image: application-processor bring-up.
 // amd64 sibling of nkernsmp/x86/nccpu.cpp NKern::BootAP + the AP half of k_entry. The generic

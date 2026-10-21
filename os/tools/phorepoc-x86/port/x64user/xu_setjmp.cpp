@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_setjmp.cpp -- Path C (amd64/x32): setjmp/longjmp for ESTLIB, in place of the ARM naked-asm
 // genericopenlibs/cstdlib/LSIGNAL/JMP_MARM.CIA (registry x32_drop/x32_extra). X4.26.

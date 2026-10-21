@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xk_entry.cpp -- Phorepoc amd64/x32 kernel image: entry point, early CPU tables, and the
 // minimal STATIC variant. amd64 sibling of kernel/x86/k_entry.{cia,cpp} (the entry that calls

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 /* x64s_ncsched.cpp -- Phorepoc amd64 SMP arch backend: the scheduler / per-CPU /
  * IPI / fault core the arch-neutral nkernSMP references but that is inherently

@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-1.0 */
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
 
 // xe_exctrap_asm.h -- the register save/resume sequences behind TExcTrap / TPagingExcTrap
 // (Intel syntax). In a header so the hosted run-test exctrap_test.c exercises the EXACT

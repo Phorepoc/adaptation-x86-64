@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-1.0
+# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 # euser_census_x32.sh -- IN-CONTAINER: compile census of EUSER (the user library) for the Path C
 # target (amd64 CPU, x32 ABI). UNMODIFIED baseline source, the TU list of euser.mmh with the X86

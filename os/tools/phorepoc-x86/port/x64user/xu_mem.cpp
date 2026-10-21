@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_mem.cpp -- Phorepoc amd64/x32 euser: builds the UNMODIFIED baseline common/mem.cpp.
 // mem.cpp carries an out-of-line Mem::Compare under `__GCC32__ && !__KERNEL_MODE__` that was written

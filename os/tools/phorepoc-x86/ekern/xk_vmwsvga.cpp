@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xk_vmwsvga.cpp -- Path C (2026-10-16): rungs S0 + S1 of. The VMware SVGA II / SVGA3D PCI device
 // (15AD:0405) -- what VMware Workstation exposes and what VirtualBox's `--graphicscontroller vmsvga` emulates (with

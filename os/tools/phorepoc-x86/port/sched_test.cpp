@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 /* sched_test.cpp -- cooperative scheduling on the REAL EKA2 nkern structures,
  * amd64. Links the actual arch-neutral nkern objects (TScheduler, TPriListBase

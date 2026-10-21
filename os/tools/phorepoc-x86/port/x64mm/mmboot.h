@@ -1,14 +1,19 @@
 // Copyright (c) 1998-2009 Nokia Corporation and/or its subsidiary(-ies).
 // All rights reserved.
 // This component and the accompanying materials are made available
-// under the terms of the License "Eclipse Public License v1.0"
-// which accompanies this distribution, and is available
-// at the URL "http://www.eclipse.org/legal/epl-v10.html".
+// under the terms of the Eclipse Public License v2.0, available at
+// https://www.eclipse.org/legal/epl-2.0/ (relicensed from v1.0 under
+// section 7 of the Eclipse Public License v1.0).
+// This Source Code may also be made available under the following Secondary
+// Licenses when the conditions for such availability set forth in the Eclipse
+// Public License, v. 2.0 are satisfied: GNU General Public License, version 2
+// or later.
 //
 // Initial Contributors:
 // Nokia Corporation - initial contribution.
 //
 // Contributors:
+// The Phorepoc Authors
 //
 // Description:
 //

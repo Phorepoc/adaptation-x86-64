@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_dll.cpp -- Phorepoc amd64/x32: the DLL entry point.
 // Sibling of euser/epoc/x86/uc_dll.cia + uc_dll.cpp (and of toolchain/dll_rt/dll_entry.S on ARM).

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-1.0
+# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 # ekern_census_x32.sh -- IN-CONTAINER: compile census of the FULL EKA2 kernel (ekern) for
 # the Path C target (amd64 CPU, x32 ABI), the way tools/kernel/ekern_compile_check.sh did

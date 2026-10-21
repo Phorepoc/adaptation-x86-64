@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_utl.cpp -- Phorepoc amd64/x32 euser: siblings of euser/epoc/x86/{uc_trp,uc_utl,uc_i64}.cia.
 // C++ wherever the IA-32 original was asm only for speed; naked asm only where register state IS

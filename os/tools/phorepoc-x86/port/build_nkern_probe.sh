@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: EPL-1.0
+# SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 # build_nkern_probe.sh -- IN-CONTAINER: compile the arch-NEUTRAL EKA2 nkern
 # source UNMODIFIED for a freestanding x86_64 target, against our amd64 port

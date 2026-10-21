@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: EPL-1.0 */
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later */
 
 // xk_board.h -- boot-time facts the low boot stub (xboot.cpp) hands to the board code in the
 // kernel (OURS), in SSuperPageBase::iReserved[] beside the CPU hand-over words (x64_root.h uses

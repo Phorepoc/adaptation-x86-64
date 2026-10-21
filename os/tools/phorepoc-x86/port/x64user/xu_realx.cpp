@@ -1,6 +1,6 @@
 // Portions Copyright (c) Nokia Corporation and/or its subsidiary(-ies)
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: EPL-1.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-or-later
 
 // xu_realx.cpp -- Phorepoc amd64/x32 euser: sibling of euser/epoc/x86/uc_realx.cia (TRealX).
 // The IA-32 original is 3348 lines of register-level asm; nothing in it needs to BE asm, so this is
