@@ -52,8 +52,8 @@ static TInt ScreenPitch();
 #define XK_SCALE 0
 #endif
 TInt X64ScreenW, X64ScreenH;				// what the HAL reports (the i8042 mouse area follows it)
-// The shadow screen's words per line: rows padded to 64 bytes, as the real S^3 hardware lays them out (the 701's HAL
-// reports 1472 bytes for its 360-px rows); games that write ScreenInfo memory assume that stride (SkyForce: 368 px)
+// The shadow screen's words per line: rows padded to 64 bytes, as the real S^3 hardware lays them out (the HAL
+// there reports 1472 bytes for 360-px rows); games that write ScreenInfo memory assume that stride (SkyForce: 368 px)
 static inline TInt ScreenWpl() { return (X64ScreenW + 15) & ~15; }
 TInt X64Scale = 1;							// framebuffer pixels per screen pixel, each way
 TInt X64ScreenOx, X64ScreenOy;				// framebuffer pixel of the screen's (0,0)
