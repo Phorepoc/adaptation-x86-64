@@ -6,7 +6,7 @@
 # for the Path C target (amd64 CPU, x32 ABI). UNMODIFIED baseline source, the TU list of
 # sfsrv/efsrv.mmh. Sibling of euser_census_x32.sh / efile_census_x32.sh.
 #   LINK=1: keep objects + publish the compile line (flags.txt) for emitter/build_efsrv_x32.py.
-#   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
+#   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/port/efsrv_census_x32.sh
 #
 # efsrv is what EVERY F32 client links against (RFs/RFile/RDir/TParse...); EFILE itself imports

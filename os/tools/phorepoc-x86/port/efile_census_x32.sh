@@ -8,7 +8,7 @@
 # bounded output. The point is to SIZE the port before committing to it.
 #   LINK=1: keep objects, ld -r them and list the UNDEFINED symbols = EFILE's import surface,
 #           and publish the compile line (flags.txt) for emitter/build_efile_x32.py.
-#   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
+#   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/port/efile_census_x32.sh
 #
 # The TU list and every include/define shim below come from the ARM side, which already proves

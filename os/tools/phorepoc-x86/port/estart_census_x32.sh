@@ -8,7 +8,7 @@
 # bounded output. The point is to SIZE the port before committing to it.
 #   LINK=1: keep objects, ld -r them and list the UNDEFINED symbols = ESTART's import surface,
 #           and publish the compile line (flags.txt) for emitter/build_estart_x32.py.
-#   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
+#   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/port/estart_census_x32.sh
 #
 # ESTART is tiny next to EFILE -- two TUs, ~2700 lines -- and is an EXE over the same three DLLs

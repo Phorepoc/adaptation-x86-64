@@ -6,7 +6,7 @@
 # kernel (ekern + flexible memory model + nkernSMP + our amd64 backends), not the nanokernel
 # demo (make_smp.sh). One multiboot2 ELF: low boot stub (boot.S + xboot.cpp) + the kernel image
 # at EKA2's native linear addresses (ekern.lds). Tree at $KVIEW (default /repo), output in $KOUT/ekern (default /out).
-#   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
+#   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/ekern/make_ekern.sh [run]
 set -eu
 # Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the

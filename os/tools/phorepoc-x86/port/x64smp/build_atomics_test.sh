@@ -5,7 +5,7 @@
 # build_atomics_test.sh -- IN-CONTAINER, hosted: build + run atomics_test.cpp against the REAL
 # x64s_atomics.cpp (unmodified; only <e32def.h> is the shim in atomics_test_shim/), at -O2 and
 # -O0. Semantics test, not a concurrency test -- the SMP proof is the kernel itself.
-#   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
+#   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/port/x64smp/build_atomics_test.sh
 # Bounded output; each run ends in `ATOMICS OK` or `ATOMICS FAIL n`.
 set -u

@@ -8,7 +8,7 @@
 # output. The point is to SIZE the userland port: which TUs are free, which need an amd64 sibling
 # (expected: the IA-32 .cia asm files -- cdecl stack arguments do not exist under SysV).
 #   LINK=1: keep objects, ld -r them and list the UNDEFINED symbols = the euser backend surface.
-#   host:  docker.exe run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
+#   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/port/euser_census_x32.sh
 # IA-32 asm (.cia) TUs are replaced by amd64 siblings in port/x64user/ (@-prefixed below):
 #   uc_exec.cia -> xu_exec.cpp (+ shadowed u32exec.h)   uc_trp/uc_utl/uc_i64.cia -> xu_utl.cpp
