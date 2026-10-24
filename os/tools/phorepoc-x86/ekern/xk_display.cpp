@@ -62,6 +62,11 @@ static TInt TheScreenOffset;				// bytes from the framebuffer base to the screen
 
 static TInt ModeInfo(TInt aMode, TVideoInfoV01& a)
 	{
+	// the generic screen driver (scnew.cpp DeviceOrientationsAvailable/SetDeviceOrientation) queries the flipped (90/270 degree)
+	// surface with the in-value  mode | EHalFlippedFlag (0x80000000); without this a landscape game's direct screen access
+	// device is refused ('Feature is not supported'). Same rule as the ARM board's display HAL.
+	const TBool flipped = (TUint32)aMode & 0x80000000u;
+	aMode = (TInt)((TUint32)aMode & 0x7fffffffu);
 	memclr(&a, sizeof(a));
 	a.iIsPixelOrderRGB = ETrue;
 	a.iIsPixelOrderLandscape = ETrue;
@@ -91,6 +96,14 @@ static TInt ModeInfo(TInt aMode, TVideoInfoV01& a)
 	// 7 pt font came out 9 px instead of ~20)
 	a.iSizeInTwips.iWidth = a.iSizeInPixels.iWidth * 48 / 7;
 	a.iSizeInTwips.iHeight = a.iSizeInPixels.iHeight * 48 / 7;
+	if (flipped)
+		{
+		TInt pw = a.iSizeInPixels.iWidth, ph = a.iSizeInPixels.iHeight;
+		a.iSizeInPixels.iWidth = ph; a.iSizeInPixels.iHeight = pw;
+		TInt tw = a.iSizeInTwips.iWidth, th = a.iSizeInTwips.iHeight;
+		a.iSizeInTwips.iWidth = th; a.iSizeInTwips.iHeight = tw;
+		a.iOffsetBetweenLines = ph * (a.iBitsPerPixel / 8);
+		}
 	return KErrNone;
 	}
 
