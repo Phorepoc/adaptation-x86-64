@@ -33,6 +33,8 @@ DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D_UNICODE -D__DLL__ 
 # (-idirafter baseline: the Symbian root, for <kernelhwsrv/...> includes of our port files, as every component has it)
 INCS="-idirafter baseline -I toolchain/overlay -I $PORT/x64user -I $EKA/include -I $EKA/euser -I $EKA/euser/unicode -I $EKA/common \
       -I baseline/kernelhwsrv/halservices/hal/inc -I toolchain/kinc -I toolchain/generated -I $PORT"
+# Linux: the source keeps some headers in mixed case (F32plugin.h); the build's casefix links answer the lower-case name
+[ -d /out/casefix ] && INCS="$INCS -idirafter /out/casefix"
 PRE="-include $PORT/port_prelude.h -include e32def.h"
 # LINK=1: publish the exact compile line so emitter/build_euser_x32.py builds its own TUs
 # (xu_dll.cpp, the unimpl stubs) with the SAME flags instead of a drifting copy of them.

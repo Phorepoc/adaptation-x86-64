@@ -34,6 +34,8 @@ CXX="gcc -mx32 -ffreestanding -fno-pic -fno-stack-protector -nostdinc -std=gnu++
 DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D_UNICODE -D__DLL__ ${EXTRA_DEFS:-}"
 INCS="-I toolchain/overlay -I $PORT/x64user -I $HAL/inc -I $EKA/include -I $EKA/euser -I $EKA/common \
       -I toolchain/kinc -I toolchain/generated -I $PORT"
+# Linux: the source keeps some headers in mixed case (F32plugin.h); the build's casefix links answer the lower-case name
+[ -d /out/casefix ] && INCS="$INCS -idirafter /out/casefix"
 PRE="-include $PORT/port_prelude.h -include e32def.h"
 [ "$LINK" = 1 ] && echo "$CXX $DEFS $INCS $PRE" > "$OUT/flags.txt"
 

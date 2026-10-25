@@ -44,6 +44,8 @@ QUOTE="-iquote tools/phorepoc-x86/port/f32 -iquote $FS/inc -iquote $FS/sfile -iq
 INCS="-I tools/phorepoc-x86/port/f32 -I toolchain/overlay -I $PORT/x64user -I $FS/sfsrv -I $FS/sfile -I $FS/inc -I $FS/ftrace -I $FS/sfat32 \
       -I $EKA/include -I $EKA/euser -I $EKA/common \
       -I baseline/kernelhwsrv/halservices/hal/inc -I toolchain/kinc -I toolchain/generated -I $PORT"
+# Linux: the source keeps some headers in mixed case (F32plugin.h); the build's casefix links answer the lower-case name
+[ -d /out/casefix ] && INCS="$INCS -idirafter /out/casefix"
 PRE="-include $PORT/port_prelude.h -include e32def.h"
 [ "$LINK" = 1 ] && echo "$CXX $DEFS $QUOTE $INCS $PRE" > "$OUT/flags.txt"
 
