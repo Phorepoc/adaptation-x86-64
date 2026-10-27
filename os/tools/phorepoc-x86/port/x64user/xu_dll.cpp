@@ -37,11 +37,30 @@ extern "C" {
 extern void (*const __init_array_start[])();
 extern void (*const __init_array_end[])();
 
+#ifdef PH_DLL_EH
+// C++ exceptions (component option eh=True): x32_dll_eh.ld keeps this module's .eh_frame between __eh_frame_start and a zero
+// word; it is registered with the process's one unwinder (pheeh.dll; pheeh registers its own frames with itself) BEFORE the
+// static constructors run, so a constructor may throw and catch. One static object per module (EPOCALLOWDLLDATA: per process).
+extern char __eh_frame_start[];
+struct ph_eh_object { void* a; void* b; void* c; void* d; void* e[8]; };
+void __register_frame_info(const void*, ph_eh_object*);
+void* __deregister_frame_info(const void*);
+static ph_eh_object g_ph_eh_object;
+#endif
+
 TInt _E32Dll_Body(TInt aReason)
 	{
+#ifdef PH_DLL_EH
+	if (aReason == KModuleEntryReasonProcessAttach)
+		__register_frame_info(__eh_frame_start, &g_ph_eh_object);
+#endif
 	if (aReason == KModuleEntryReasonProcessAttach)
 		for (void (*const* f)() = __init_array_start; f < __init_array_end; ++f)
 			(**f)();
+#ifdef PH_DLL_EH
+	if (aReason == KModuleEntryReasonProcessDetach)
+		__deregister_frame_info(__eh_frame_start);
+#endif
 	// X64_TODO: KModuleEntryReasonProcessDetach -> .fini_array walk (destroyStatics).
 	return KErrNone;
 	}
