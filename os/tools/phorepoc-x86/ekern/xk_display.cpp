@@ -51,7 +51,19 @@ static TInt ScreenPitch();
 #ifndef XK_SCALE
 #define XK_SCALE 0
 #endif
+// Dynamic resolution (make_ekern.sh DYNRES=1, SCREEN=WxH = the largest screen). The shadow screen is the
+// WSERV "physical" screen at its maximum size (the HAL reports it, address and pitch never change); what the
+// display shows is its top-left X64ActiveW x X64ActiveH, and a host window resize (or HAL 0x7102) changes THAT
+// together with the real DISPI framebuffer mode. WSERV takes the new size at run time through its own screen-mode
+// attributes. Without DYNRES the active size is the screen size.
+#ifndef XK_DYNRES
+#define XK_DYNRES 0
+#endif
+enum { EDisplayHalPhoreActive = 0x7101, EDisplayHalPhoreRequest = 0x7102 };
+void X64DisplayRequestMode(TInt aW, TInt aH);
 TInt X64ScreenW, X64ScreenH;				// what the HAL reports (the i8042 mouse area follows it)
+TInt X64ActiveW, X64ActiveH;				// the part of it that is on the display (the whole of it unless XK_DYNRES)
+static TInt TheDisplayGen;					// counts the active-size changes (clients poll it)
 // The shadow screen's words per line: rows padded to 64 bytes, as the real S^3 hardware lays them out (the HAL
 // there reports 1472 bytes for 360-px rows); games that write ScreenInfo memory assume that stride (SkyForce: 368 px)
 static inline TInt ScreenWpl() { return (X64ScreenW + 15) & ~15; }
@@ -170,6 +182,15 @@ static TInt DisplayHal(TAny*, TInt aFunction, TAny* a1, TAny* a2)
 			Kern::InfoCopy(*(TDes8*)a1, v);
 		return r;
 		}
+	case EDisplayHalPhoreActive:
+		{
+		TInt v[3] = { X64ActiveW, X64ActiveH, TheDisplayGen };
+		kumemput32(a1, v, sizeof(v));
+		return KErrNone;
+		}
+	case EDisplayHalPhoreRequest:
+		X64DisplayRequestMode((TInt)a1, (TInt)a2);
+		return KErrNone;
 	case EDisplayHalWsRegisterSwitchOnScreenHandling:
 	case EDisplayHalWsSwitchOnScreen:
 		return KErrNone;
@@ -307,14 +328,15 @@ static void FlushDfcFn(TAny*)
 	{
 	volatile TUint32* fb = (volatile TUint32*)TheFbChunk->LinearAddress();
 	const TInt wpl = TheFb.iPitch / 4;							// framebuffer words per line
-	const TInt w = X64ScreenW, s = X64Scale;
+	const TInt w = X64ScreenW, s = X64Scale;						// w = the shadow's line length
+	const TInt aw = X64ActiveW, ah = X64ActiveH;					// the part on the display
 	volatile TUint32* origin = fb + X64ScreenOy*wpl + X64ScreenOx;
 	TBool underCursor = EFalse;
-	for (TInt y=0; y<X64ScreenH; ++y)
+	for (TInt y=0; y<ah; ++y)
 		{
 		const TUint32* src = TheScreen + y*ScreenWpl();
 		TUint32* m = TheMirror + y*w;
-		TInt first = 0, last = w - 1;
+		TInt first = 0, last = aw - 1;
 		while (first <= last && src[first] == m[first])
 			++first;
 		if (first > last)
@@ -444,6 +466,11 @@ static void SetMode(TInt aW, TInt aH)
 
 static void PlaceScreen()
 	{
+#if XK_DYNRES
+	X64ScreenOx = X64ScreenOy = 0;									// the active part fills the framebuffer
+	TheScreenOffset = 0;
+	return;
+#endif
 	X64ScreenOx = (TheFb.iWidth - X64ScreenW * X64Scale) / 2;
 	X64ScreenOy = (TheFb.iHeight - X64ScreenH * X64Scale) / 2;
 	TheScreenOffset = X64ScreenOy * TheFb.iPitch + X64ScreenOx * 4;
@@ -468,12 +495,23 @@ void X64DisplayRequestMode(TInt aW, TInt aH)
 
 static void ModeDfcFn(TAny*)
 	{
+#if XK_DYNRES
+	// X4.139: the display takes the asked size (up to the shadow screen's), 1:1; the shadow keeps its size
+	const TInt w = Min(Max(TheReqW, 320), X64ScreenW), h = Min(Max(TheReqH, 200), X64ScreenH);
+#else
 	const TInt w = Max(TheReqW, X64ScreenW), h = Max(TheReqH, X64ScreenH);	// never smaller than the phone
+#endif
 	if (w * h * 4 > KFbMapMax || (w == (TInt)TheFb.iWidth && h == (TInt)TheFb.iHeight))
 		return;
 	SetMode(w, h);									// TheFb follows (or keeps the old mode if refused)
 	X64FbW = TheFb.iWidth;  X64FbH = TheFb.iHeight;
+#if XK_DYNRES
+	X64Scale = 1;
+	X64ActiveW = Min(X64FbW, X64ScreenW);  X64ActiveH = Min(X64FbH, X64ScreenH);
+	++TheDisplayGen;
+#else
 	X64Scale = Max(1, Min(X64FbW / X64ScreenW, X64FbH / X64ScreenH));
+#endif
 	PlaceScreen();
 	memclr((TAny*)TheFbChunk->LinearAddress(), TheFb.iPitch * TheFb.iHeight);
 	const TInt n = X64ScreenW * X64ScreenH;			// the mirror no longer matches: redraw everything
@@ -507,6 +545,14 @@ void X64StartDisplay()
 		const TInt fit = Min(TheFb.iWidth / XK_SCREEN_W, TheFb.iHeight / XK_SCREEN_H);
 		X64Scale = (XK_SCALE > 0 && XK_SCALE < fit) ? XK_SCALE : fit;
 		}
+#if XK_DYNRES
+	if (XK_SCREEN_W > 0)
+		{
+		X64ScreenW = XK_SCREEN_W;  X64ScreenH = XK_SCREEN_H;			// the largest screen WSERV will ever see
+		X64Scale = 1;
+		}
+#endif
+	X64ActiveW = Min(X64FbW, X64ScreenW);  X64ActiveH = Min(X64FbH, X64ScreenH);
 	PlaceScreen();
 	NKern::ThreadEnterCS();
 	TInt r = DPlatChunkHw::New(TheVgaChunk, KVgaWindowPhys, KVgaWindowSize,
@@ -543,7 +589,7 @@ void X64StartDisplay()
 		memclr((TAny*)TheFbChunk->LinearAddress(), 256*1024);
 		// make_ekern.sh FBSHADOW=0|1 overrides the measurement (A/B testing); default -1 = decide.
 		// A scaled screen always has the shadow: the flusher is what scales (X4.35).
-		if (X64Scale > 1 || XK_FB_SHADOW == 1 || (XK_FB_SHADOW < 0 && (fb[0]*4 < ram[0] || fb[1]*4 < ram[1])))
+		if (X64Scale > 1 || XK_DYNRES || XK_FB_SHADOW == 1 || (XK_FB_SHADOW < 0 && (fb[0]*4 < ram[0] || fb[1]*4 < ram[1])))
 			{
 			r = StartShadow();
 			Kern::Printf("[display] shadow screen at %08x (%s), flushed x%d every %d ms -> %d",

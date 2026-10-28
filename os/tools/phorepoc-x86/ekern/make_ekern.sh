@@ -70,6 +70,9 @@ SCREENDEF=""; [ -n "${SCREEN:-}" ] && SCREENDEF="-DXK_SCREEN_W=${SCREEN%x*} -DXK
 # SCALE=1 = the old 1024x768 framebuffer with the screen centred 1:1. If GRUB cannot set that mode the
 # display takes the largest scale that fits whatever it got. VirtualBox: vbox_test.sh adds the mode.
 FBDEF=""
+# DYNRES=1 (X4.139, dynamic resolution): SCREEN=WxH is the LARGEST screen WSERV will see (the shadow screen); the display
+# shows its top-left part at 1:1 and follows the host window / HAL requests (xk_display.cpp, docs/phorepoc/dynamic-resolution.md)
+[ "${DYNRES:-0}" = 1 ] && { SCALE=1; SCREEN="${SCREEN:-1920x1200}"; SCREENDEF="-DXK_SCREEN_W=${SCREEN%x*} -DXK_SCREEN_H=${SCREEN#*x} -DXK_DYNRES=1"; }
 if [ -n "${SCREEN:-}" ] && [ "${SCALE:-2}" -gt 1 ]; then
   FBDEF="-DFB_W=$(( ${SCREEN%x*} * ${SCALE:-2} )) -DFB_H=$(( ${SCREEN#*x} * ${SCALE:-2} ))"
   SCREENDEF="$SCREENDEF -DXK_SCALE=${SCALE:-2}"
