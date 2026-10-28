@@ -82,7 +82,7 @@ INCS="-I $PORT/x64smp -I $EKA/include/nkernsmp -I $EKA/include/nkernsmp/x86 -I $
       -I $EKA/memmodel/epoc/flexible -I $EKA/memmodel/epoc/flexible/mmu -I $EKA/memmodel/epoc/flexible/mmu/x86 \
       -I $EKA/include/memmodel/epoc/mmubase -I $EKA/memmodel/epoc/mmubase -I $EKA/memmodel/epoc \
       -I $EKA/klib -I $EKA/common -I $KINC -I $KINC/kernel -I $PORT"
-PRE="-include $PORT/port_prelude.h -include e32def.h"
+PRE="-include toolchain/x32/port_prelude.h -include e32def.h"
 # X4.68: step 3's objects depend only on the knobs (DEFS, FBDEF), the pinned kernel (KKEY) and our own port sources;
 # a run that changes none of them (every app-debug iteration: only the ROM changes) reuses them. The ROM image
 # object (xk_uimage.o) is rebuilt when romsect.bin is newer; link + ISO are skipped when nothing changed at all.

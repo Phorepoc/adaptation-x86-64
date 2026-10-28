@@ -63,10 +63,10 @@ DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D__KERNEL_MODE__ -D_
 # path (<kernel/heap_hybrid.h>) or GENERATES (exec_enum.h from execs.txt). Arch-neutral.
 INCS="$NK -I $EKA/include -I $EKA/include/kernel -I $EKA/include/kernel/x86 \
       -I $EKA/include/memmodel/epoc $MMINC -I $EKA/memmodel/epoc -I $EKA/klib -I $EKA/common \
-      -I $KHS/halservices/hal/inc -I $KINC -I $KINC/kernel -I $PORT"
+      -I $KHS/halservices/hal/inc -I $KINC -I $KINC/kernel -I $PORT -I toolchain/x32/x64ekern"
 # Linux: the source keeps some headers in mixed case (F32plugin.h); the build's casefix links answer the lower-case name
 [ -d /out/casefix ] && INCS="$INCS -idirafter /out/casefix"
-PRE="-include $PORT/port_prelude.h -include e32def.h $RELAX"
+PRE="-include toolchain/x32/port_prelude.h -include e32def.h $RELAX"
 
 TUS="$(cd $EKA && ls kernel/*.cpp kernel/x86/*.cpp klib/*.cpp klib/x86/*.cpp 2>/dev/null)
 common/alloc.cpp common/array.cpp common/des8.cpp common/mem.cpp common/heap_hybrid.cpp

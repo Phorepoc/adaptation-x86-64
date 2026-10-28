@@ -32,7 +32,7 @@ INCS="-I $PORT/x64smp -I $EKA/include -I $EKA/include/nkernsmp -I $PORT"
 # port_prelude + e32def as usual, then relax_size_asserts.h LAST so it overrides
 # e32def's __ASSERT_COMPILE (the 32-bit TSubScheduler/TScheduler size targets can't
 # hold on amd64 -- see that header). Probe-only: it enumerates the backend surface.
-PRE="-include $PORT/port_prelude.h -include e32def.h -include $PORT/x64smp/relax_size_asserts.h"
+PRE="-include toolchain/x32/port_prelude.h -include e32def.h -include $PORT/x64smp/relax_size_asserts.h"
 
 # The arch-neutral nkernsmp TUs (from nkern.mmp), in intended build order.
 NEUTRAL="nklib.cpp:nkern nkern.cpp:nkernsmp nkerns.cpp:nkernsmp sched.cpp:nkernsmp \

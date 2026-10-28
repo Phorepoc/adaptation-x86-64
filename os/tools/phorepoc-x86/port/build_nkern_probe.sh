@@ -28,7 +28,7 @@ CXX="gcc $ABI -ffreestanding -fno-pic -fno-stack-protector -nostdinc \
 # Symbian include roots + arch/toolchain selection macros.
 DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D__KERNEL_MODE__"
 INCS="-I $EKA/include -I $EKA/include/nkern -I $PORT/x64 -I $PORT"
-PRE="-include $PORT/port_prelude.h -include e32def.h"
+PRE="-include toolchain/x32/port_prelude.h -include e32def.h"
 
 # The arch-neutral nkern TUs, in intended build order. Grown as each compiles.
 NEUTRAL="nklib.cpp nk_timer.cpp dfcs.cpp sched.cpp nkern.cpp nkerns.cpp"

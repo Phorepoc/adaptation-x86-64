@@ -27,7 +27,7 @@ with open(img, "r+b") as f:
     f.seek(0x1FE); f.write(b"\x55\xaa")
 EOF
 # mtools addresses a partition by byte offset (@@). FAT32 (2026-10-12, user: FAT16 is out -- C: is FAT32 through efat32.fsy,
-# tools/phorepoc-x86/board/estart.txt, as on the PinePhone): clusters from 512 B, doubled while there would be more than
+# board/estart.txt): clusters from 512 B, doubled while there would be more than
 # 262144 of them (64 MB: 512 B, 1 GB: 4 KB); FAT32 itself needs >= 65525 clusters, true from 32 MB at 512 B
 C=1
 while [ $(( (MB - 1) * 2048 / C )) -gt 262144 ] && [ $C -lt 64 ]; do C=$(( C * 2 )); done

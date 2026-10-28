@@ -12,7 +12,7 @@ On its own this repository doesn't make a bootable system. A device repository b
 ## What's in here
 
 ```
-os/tools/phorepoc-x86/port/    the kernel port, plus the user-side pieces in x64user/
+os/tools/phorepoc-x86/port/    the kernel port (the x32 user runtime is core's: os/toolchain/x32/)
 os/tools/phorepoc-x86/ekern/   the scripts that build the kernel image and the bootable ISO
 os/emitter/                    kernel build steps the ROM recipe runs
 ```

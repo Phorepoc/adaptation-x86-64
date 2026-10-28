@@ -36,7 +36,7 @@ BCXX="gcc $ABI -ffreestanding -fno-pic -fno-stack-protector -nostdinc \
 
 DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D__KERNEL_MODE__"
 INCS="-I $SMP -I $EKA/include -I $EKA/include/nkernsmp -I $PORT"
-PRE="-include $PORT/port_prelude.h -include e32def.h $RELAX"
+PRE="-include toolchain/x32/port_prelude.h -include e32def.h $RELAX"
 
 NEUTRAL="nklib.cpp:nkern nkern.cpp:nkernsmp nkerns.cpp:nkernsmp sched.cpp:nkernsmp \
          dfcs.cpp:nkernsmp nk_timer.cpp:nkernsmp nk_irq.cpp:nkernsmp nk_bal.cpp:nkernsmp"
@@ -55,7 +55,8 @@ done
 echo "== compile amd64 SMP backend =="
 for b in x64s_atomics x64s_ncutils x64s_ncsched; do
     printf "  %-14s " "$b.cpp"
-    if $BCXX $DEFS $INCS $PRE -c "$SMP/$b.cpp" -o "$OUT/$b.o" 2>"$OUT/$b.log"; then
+    src="$SMP/$b.cpp"; [ $b = x64s_atomics ] && src=toolchain/x32/x64smp/$b.cpp   # (the atomics are core's: user side too)
+    if $BCXX $DEFS $INCS $PRE -c "$src" -o "$OUT/$b.o" 2>"$OUT/$b.log"; then
         echo "OK"
     else
         echo "FAIL"; grep -E "error:" "$OUT/$b.log" | sed 's/^/      /' | head -20; exit 1

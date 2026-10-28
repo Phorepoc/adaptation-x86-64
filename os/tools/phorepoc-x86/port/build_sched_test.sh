@@ -24,7 +24,7 @@ CXX="gcc -m64 -ffreestanding -fno-pic -fno-stack-protector -nostdinc \
      -mno-red-zone -mgeneral-regs-only -fpermissive"
 DEFS="-D__CPU_X86 -D__GCC32__ -D__EPOC32__ -D__SYMBIAN32__ -D__KERNEL_MODE__"
 INCS="-I $EKA/include -I $EKA/include/nkern -I $PORT/x64 -I $PORT"
-PRE="-include $PORT/port_prelude.h -include e32def.h"
+PRE="-include toolchain/x32/port_prelude.h -include e32def.h"
 $CXX $DEFS $INCS $PRE -c "$PORT/sched_test.cpp" -o "$OUT/sched_test.o"
 
 # 3. Link HOSTED (plain gcc pulls glibc for printf + runs .init_array ctors).
