@@ -482,7 +482,7 @@ TInt X64SwitchHal(TAny* /*aPtr*/, TInt aFunction, TAny* a1, TAny* /*a2*/)
 	{
 	if (aFunction != KX64HalSwitchGrip)
 		return KErrNotSupported;
-	// SLIDE=1 (2026-10-08): report the slide CLOSED -- a touch-only phone, as the PinePhone: the FEP's QWERTY mode
+	// SLIDE=1 (2026-10-08): report the slide CLOSED -- a touch-only phone: the FEP's QWERTY mode
 	// is off and an editor tap should open the virtual keyboard (the VKB investigation)
 	const TInt open = XK_SLIDE_CLOSED ? 1 : 0;
 	kumemput32(a1, &open, sizeof(TInt));

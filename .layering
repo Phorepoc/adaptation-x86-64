@@ -1,0 +1,6 @@
+# What this SoC repository must not name (pdk tools/ci/layering.sh, docs/layering.md): its boards, other devices
+pine ?phone
+pine64
+adaptation-[a-wyz0-9]
+belle
+open4all

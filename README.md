@@ -6,14 +6,15 @@ This is the port of the Symbian kernel to 64-bit x86 processors. The 2010 releas
 It uses the x32 ABI: the processor runs in 64-bit mode, but pointers stay 32 bits wide. Symbian was written around
 32-bit pointers, so this lets its code run unchanged at full 64-bit speed.
 
-On its own this repository doesn't make a bootable system. A device repository builds on top of it, and for now that's
-[adaptation-pc](https://github.com/Phorepoc/adaptation-pc), which covers QEMU, VirtualBox and real PCs.
+On its own this repository doesn't make a bootable system: a board repository builds on top of it and names it in its
+`board.conf` (the pdk's docs/layering.md). The drivers cover real PC hardware and what QEMU and VirtualBox emulate.
 
 ## What's in here
 
 ```
 os/tools/phorepoc-x86/port/    the kernel port (the x32 user runtime is core's: os/toolchain/x32/)
 os/tools/phorepoc-x86/ekern/   the scripts that build the kernel image and the bootable ISO
+recipes/kernel.sh              the kernel recipe (ph image recipe kernel -b <board>)
 os/emitter/                    kernel build steps the ROM recipe runs
 ```
 
@@ -22,7 +23,7 @@ At build time `os/` is laid over [core](https://github.com/Phorepoc/core)'s `os/
 ## Building
 
 You don't build this repository by itself. Check it out next to core, the [pdk](https://github.com/Phorepoc/pdk) and
-adaptation-pc, and build the PC image as the pdk README describes. `-b pc` brings this repository in.
+a board that uses it, and build that board (`ph ... -b <board>`). The kernel image is `ph image recipe kernel`.
 
 ## License
 

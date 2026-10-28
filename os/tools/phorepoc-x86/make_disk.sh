@@ -5,7 +5,7 @@
 # make_disk.sh -- IN-CONTAINER: the Path C test hard disk (X4.22). A raw image with an MBR and one FAT32
 # primary partition (type 06, from sector 2048), formatted with mtools, a README on it. The kernel's ATA
 # driver (ekern/xk_ata.cpp) finds the partition and ESTART mounts it as D:.
-#   out:   $KOUT/disk/phorepoc-disk.img  (QEMU: make_ekern.sh DISK=1 run; ph image vbox converts it to a VMDK)
+#   out:   $KOUT/disk/phorepoc-disk.img  (QEMU: make_ekern.sh DISK=1 run; a board's recipe can convert it to a VMDK)
 # LABEL=: the FAT volume label (the memory card image is built with LABEL="MEMORY CARD", X4.111).
 # An existing image is kept (it is the persistent disk); FRESH=1 rebuilds it.
 set -eu
