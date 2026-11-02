@@ -14,7 +14,7 @@ On its own this repository doesn't make a bootable system: a board repository bu
 ```
 os/tools/phorepoc-x86/port/    the kernel port (the x32 user runtime is core's: os/toolchain/x32/)
 os/tools/phorepoc-x86/ekern/   the scripts that build the kernel image and the bootable ISO
-recipes/kernel.sh              the kernel recipe (ph image recipe kernel -b <board>)
+recipes/kernel.sh              the kernel recipe (phe image recipe kernel -b <board>)
 os/emitter/                    kernel build steps the ROM recipe runs
 ```
 
@@ -23,7 +23,7 @@ At build time `os/` is laid over [core](https://github.com/Phorepoc/core)'s `os/
 ## Building
 
 You don't build this repository by itself. Check it out next to core, the [pdk](https://github.com/Phorepoc/pdk) and
-a board that uses it, and build that board (`ph ... -b <board>`). The kernel image is `ph image recipe kernel`.
+a board that uses it, and build that board (`phe ... -b <board>`). The kernel image is `phe image recipe kernel`.
 
 ## License
 

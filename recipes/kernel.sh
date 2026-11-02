@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # recipes/kernel.sh -- build the x86-64 (x32) kernel and the bootable GRUB ISO that carries the ROM
-# "ph image rom" made. Runs on Linux inside the toolchain container ("ph image recipe kernel -b <board>" does that).
+# "phe image rom" made. Runs on Linux inside the toolchain container ("phe image recipe kernel -b <board>" does that).
 #
 #   1. the kernel include shims: the headers the release's build exports to a relocated path (heap_hybrid.h, hal_int.h)
 #      or generates (exec_*.h, by the release's own genexec.pl over execs.txt) -> $BUILD/x86/kinc
@@ -14,7 +14,7 @@
 # PHOREPOC_BUILD (all output: the ROM from $BUILD/rom, the kernel and ISO in $BUILD/x86/ekern).
 # Settings of the kernel build (make_ekern.sh): DBG=0|1 (default 1), SCREEN=WxH (default 360x640), SCALE=n, TRACE=<hex>, KCLEAN=1.
 set -eu
-PDK="${PHOREPOC_PDK:?run it with ph image recipe kernel -b <board>}"
+PDK="${PHOREPOC_PDK:?run it with phe image recipe kernel -b <board>}"
 export PHOREPOC_CORE="${PHOREPOC_CORE:-$PDK/../core}"
 export PHOREPOC_OS_ROOT="${PHOREPOC_OS_ROOT:-$PHOREPOC_CORE/os}"
 export PHOREPOC_SYMBIAN="${PHOREPOC_SYMBIAN:-$PHOREPOC_CORE/symbian}"
@@ -26,9 +26,9 @@ KHS="$SYM10/oss.FCL.sf.os.kernelhwsrv"
 KOUT="$PHOREPOC_BUILD/x86"
 KROM="$PHOREPOC_BUILD/rom/romsect.bin"
 
-[ -d "$KHS/kernel/eka" ] || { echo "no kernel source at $KHS (ph source fetch)" >&2; exit 1; }
+[ -d "$KHS/kernel/eka" ] || { echo "no kernel source at $KHS (phe source fetch)" >&2; exit 1; }
 [ -f "$OS_ROOT/tools/phorepoc-x86/ekern/make_ekern.sh" ] || { echo "no x86 kernel scripts in $OS_ROOT/tools/phorepoc-x86" >&2; exit 1; }
-[ -f "$KROM" ] || { echo "no ROM at $KROM (ph image rom first)" >&2; exit 1; }
+[ -f "$KROM" ] || { echo "no ROM at $KROM (phe image rom first)" >&2; exit 1; }
 mkdir -p "$KOUT"
 
 echo "[kinc] kernel include shims"

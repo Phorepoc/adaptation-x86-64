@@ -8,7 +8,7 @@
 # (zero unresolved). The SMP analogue of build_nkern_probe.sh's link self-check.
 # Runs inside the phorepoc-x86 Docker image (repo at /repo).
 set -eu
-# Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the
+# Layout (all default to the in-tree values; phe image kernel sets them for the public repos): KVIEW = the tree root the
 # relative paths below hang off (the merged OS tree), KOUT = output, KHS = kernelhwsrv, KINC = the kernel include shims.
 KVIEW="${KVIEW:-/repo}"; KOUT="${KOUT:-/out}"
 KHS="${KHS:-baseline/kernelhwsrv}"; KINC="${KINC:-toolchain/kinc}"

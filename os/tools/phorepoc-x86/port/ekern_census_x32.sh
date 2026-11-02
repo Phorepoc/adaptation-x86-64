@@ -13,7 +13,7 @@
 #   LINK=1: keep objects (only the TUs ekern.mmp really lists), ld -r them with the nkernsmp
 #           set from make_smp.sh and print the UNDEFINED symbols = the ekern backend surface.
 set -u
-# Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the
+# Layout (all default to the in-tree values; phe image kernel sets them for the public repos): KVIEW = the tree root the
 # relative paths below hang off (the merged OS tree), KOUT = output, KHS = kernelhwsrv, KINC = the kernel include shims.
 KVIEW="${KVIEW:-/repo}"; KOUT="${KOUT:-/out}"
 KHS="${KHS:-baseline/kernelhwsrv}"; KINC="${KINC:-toolchain/kinc}"

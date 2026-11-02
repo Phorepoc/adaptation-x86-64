@@ -9,7 +9,7 @@
 #   host:  docker run --rm -v <repo>:/repo -v <repo>/.phorepoc-x86-build:/out phorepoc-x86 \
 #              bash /repo/tools/phorepoc-x86/ekern/make_ekern.sh [run]
 set -eu
-# Layout (all default to the in-tree values; ph image kernel sets them for the public repos): KVIEW = the tree root the
+# Layout (all default to the in-tree values; phe image kernel sets them for the public repos): KVIEW = the tree root the
 # relative paths below hang off (the merged OS tree), KOUT = output, KHS = kernelhwsrv, KINC = the kernel include shims.
 KVIEW="${KVIEW:-/repo}"; KOUT="${KOUT:-/out}"
 KHS="${KHS:-baseline/kernelhwsrv}"; KINC="${KINC:-toolchain/kinc}"
