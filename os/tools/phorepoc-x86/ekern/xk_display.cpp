@@ -531,7 +531,7 @@ void X64StartDisplay()
 	TheFb.iHeight = w[KX64SuperFbHeight];
 	TheFb.iBpp = w[KX64SuperFbFormat] & 0xFF;
 	TheFb.iRgb = (w[KX64SuperFbFormat] >> 8) & 1;
-	if (TheFb.iPhys && TheFb.iBpp == 32 && XK_SCALE > 1 && XK_SCREEN_W > 0 &&
+	if (TheFb.iPhys && TheFb.iBpp == 32 && XK_SCALE >= 1 && XK_SCREEN_W > 0 &&
 		((TInt)TheFb.iWidth != XK_SCREEN_W * XK_SCALE || (TInt)TheFb.iHeight != XK_SCREEN_H * XK_SCALE))
 		SetMode(XK_SCREEN_W * XK_SCALE, XK_SCREEN_H * XK_SCALE);
 	X64FbW = X64ScreenW = TheFb.iWidth;

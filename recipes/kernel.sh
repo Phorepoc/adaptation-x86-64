@@ -12,7 +12,7 @@
 #
 # Paths: PHOREPOC_OS_ROOT / PHOREPOC_ADAPTATIONS (the OS tree, merged), PHOREPOC_SYMBIAN (the source),
 # PHOREPOC_BUILD (all output: the ROM from $BUILD/rom, the kernel and ISO in $BUILD/x86/ekern).
-# Settings of the kernel build (make_ekern.sh): DBG=0|1 (default 1), SCREEN=WxH (default 360x640), SCALE=n, TRACE=<hex>, KCLEAN=1.
+# Settings of the kernel build (make_ekern.sh): DBG=0|1 (default 1), SCREEN=WxH (default 360x640), SCALE=n (default 1), TRACE=<hex>, KCLEAN=1.
 set -eu
 PDK="${PHOREPOC_PDK:?run it with phe image recipe kernel -b <board>}"
 export PHOREPOC_CORE="${PHOREPOC_CORE:-$PDK/../core}"
@@ -47,7 +47,9 @@ export KVIEW="$OS_ROOT" KOUT KHS KINC KROM
 export KQEMU="$SYM10/oss.FCL.sf.adapt.Qemu"
 export SECONDARY=rom
 # a release image traces panics only (the default also prints every ROM page it maps); the phone screen, pixel-doubled
-export TRACE="${TRACE:-0x80000000}" SCREEN="${SCREEN:-360x640}"
+# 1:1 at first boot (no scrollbars in a normal window); the display then refits the window by the largest integer scale.
+# SCREEN=640x360 = landscape: the launcher runs, but Phonebook 2 faults (null pointer) at that layout width, so portrait stays
+export TRACE="${TRACE:-0x80000000}" SCREEN="${SCREEN:-360x640}" SCALE="${SCALE:-1}"
 bash "$OS_ROOT/tools/phorepoc-x86/ekern/make_ekern.sh" > "$KOUT/kernel.log" 2>&1 \
   && echo "kernel ok: $(ls -l "$KOUT/ekern/phorepoc-ekern.iso" | awk '{print $5, $9}')" \
   || { echo "KERNEL FAILED:"; tail -15 "$KOUT/kernel.log"; exit 1; }

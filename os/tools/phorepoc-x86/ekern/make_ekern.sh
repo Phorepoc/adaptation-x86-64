@@ -73,7 +73,8 @@ FBDEF=""
 # DYNRES=1 (X4.139, dynamic resolution): SCREEN=WxH is the LARGEST screen WSERV will see (the shadow screen); the display
 # shows its top-left part at 1:1 and follows the host window / HAL requests (xk_display.cpp, docs/phorepoc/dynamic-resolution.md)
 [ "${DYNRES:-0}" = 1 ] && { SCALE=1; SCREEN="${SCREEN:-1920x1200}"; SCREENDEF="-DXK_SCREEN_W=${SCREEN%x*} -DXK_SCREEN_H=${SCREEN#*x} -DXK_DYNRES=1"; }
-if [ -n "${SCREEN:-}" ] && [ "${SCALE:-2}" -gt 1 ]; then
+# SCALE=1 with SCREEN= also asks for a framebuffer of exactly SCREEN (a 640x360 desktop window); DYNRES keeps its own sizes
+if [ -n "${SCREEN:-}" ] && { [ "${SCALE:-2}" -gt 1 ] || { [ "${SCALE:-2}" = 1 ] && [ "${DYNRES:-0}" != 1 ]; }; }; then
   FBDEF="-DFB_W=$(( ${SCREEN%x*} * ${SCALE:-2} )) -DFB_H=$(( ${SCREEN#*x} * ${SCALE:-2} ))"
   SCREENDEF="$SCREENDEF -DXK_SCALE=${SCALE:-2}"
 fi
