@@ -1,6 +1,6 @@
 # adaptation-x86-64
 
-This is the port of the Symbian kernel to 64-bit x86 processors. The 2010 release only ran on ARM phones and on an old
+This is the port of the Phorepoc OS kernel, Symbian's EKA2, to 64-bit x86 processors. The 2010 release only ran on ARM phones and on an old
 32-bit x86 emulator. We took that emulator's kernel code and made a sibling of it for modern CPUs.
 
 It uses the x32 ABI: the processor runs in 64-bit mode, but pointers stay 32 bits wide. Symbian was written around
