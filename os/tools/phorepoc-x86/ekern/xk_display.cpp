@@ -251,6 +251,52 @@ static TUint32* TheMirror;					// supervisor copy of what the framebuffer shows 
 static TDfcQue* TheFlushQ;
 static TUint32 TheFlushes, TheFlushedRows;
 
+// The VMware SVGA II adapter (VirtualBox VMSVGA, VMware; xk_vmwsvga.cpp): the mode is set through its registers and every change of
+// the framebuffer is reported with SVGA_CMD_UPDATE (the host window repaints only what it is told about). TheSvga: that device drives
+// the display; otherwise the Bochs DISPI registers (QEMU std-vga, VirtualBox VBoxVGA) take the modes and the host scans the whole framebuffer.
+TBool X64SvgaProbe();
+TBool X64SvgaSetMode(TInt aW, TInt aH, TInt& aPitch, TUint32& aFbPhys, TUint32 aExpectPhys);
+TBool X64SvgaUpdate(TInt aX, TInt aY, TInt aW, TInt aH);
+void X64SvgaStats(TUint32& aSent, TUint32& aDropped, TUint32& aFullWaits, TBool& aDrained);
+static TBool TheSvga;
+
+// the framebuffer rectangle written since the last SVGA_CMD_UPDATE (framebuffer pixels, x1/y1 exclusive); x0 > x1 = nothing
+static TInt TheDirtyX0 = 1, TheDirtyY0 = 1, TheDirtyX1 = 0, TheDirtyY1 = 0;
+static void MarkDirty(TInt aX0, TInt aY0, TInt aX1, TInt aY1)
+	{
+	aX0 = Max(aX0, 0);  aY0 = Max(aY0, 0);
+	aX1 = Min(aX1, (TInt)TheFb.iWidth);  aY1 = Min(aY1, (TInt)TheFb.iHeight);
+	if (aX0 >= aX1 || aY0 >= aY1)
+		return;
+	if (TheDirtyX0 > TheDirtyX1)
+		{ TheDirtyX0 = aX0;  TheDirtyY0 = aY0;  TheDirtyX1 = aX1;  TheDirtyY1 = aY1;  return; }
+	TheDirtyX0 = Min(TheDirtyX0, aX0);  TheDirtyY0 = Min(TheDirtyY0, aY0);
+	TheDirtyX1 = Max(TheDirtyX1, aX1);  TheDirtyY1 = Max(TheDirtyY1, aY1);
+	}
+// one UPDATE for everything marked; if the FIFO has no room the rectangle stays marked and goes out with the next flush's
+static void SendDirty()
+	{
+	if (!TheSvga || TheDirtyX0 > TheDirtyX1)
+		return;
+	const TInt x = TheDirtyX0, y = TheDirtyY0, w = TheDirtyX1 - TheDirtyX0, h = TheDirtyY1 - TheDirtyY0;
+	if (X64SvgaUpdate(x, y, w, h))
+		{
+		TheDirtyX0 = 1;  TheDirtyY0 = 1;  TheDirtyX1 = 0;  TheDirtyY1 = 0;
+		static TUint32 lastMs, sent;
+		++sent;
+		const TUint32 ms = (TUint32)(((TUint64)NKern::TickCount() * NKern::TickPeriod()) / 1000);
+		if (sent == 1 || ms - lastMs >= 5000)						// the first, then every 5 s while the screen changes: bounded
+			{
+			lastMs = ms;
+			TUint32 n, dropped, waits;
+			TBool drained;
+			X64SvgaStats(n, dropped, waits, drained);
+			Kern::Printf("[display] svga: UPDATE #%u %dx%d at (%d,%d); sent %u, dropped %u, fifo-full waits %u, fifo drained by the host %d",
+						 sent, w, h, x, y, n, dropped, waits, drained);
+			}
+		}
+	}
+
 static void FlushTimerIsr(TAny*);
 static void FlushDfcFn(TAny*);
 static NTimer TheFlushTimer(FlushTimerIsr, NULL);
@@ -308,6 +354,7 @@ static inline TUint32 ScreenPixelAt(TInt aX, TInt aY)
 // the cursor rectangle at framebuffer (aX,aY), clipped: the arrow, or (aDraw false) what is under it
 static void CursorRect(volatile TUint32* aFb, TInt aWpl, TInt aX, TInt aY, TBool aDraw)
 	{
+	MarkDirty(aX, aY, aX + KCurW, aY + KCurH);
 	for (TInt r=0; r<KCurH; ++r)
 		{
 		const TInt y = aY + r;
@@ -344,6 +391,7 @@ static void FlushDfcFn(TAny*)
 		while (src[last] == m[last])
 			--last;
 		volatile TUint32* row = origin + y*s*wpl;
+		MarkDirty(X64ScreenOx + first*s, X64ScreenOy + y*s, X64ScreenOx + (last + 1)*s, X64ScreenOy + (y + 1)*s);
 		if (s == 1)
 			for (TInt x=first; x<=last; ++x)
 				row[x] = m[x] = src[x];
@@ -373,6 +421,7 @@ static void FlushDfcFn(TAny*)
 	if (nx >= 0 && (moved || underCursor))
 		CursorRect(fb, wpl, nx, ny, ETrue);
 	TheDrawnX = nx;  TheDrawnY = ny;
+	SendDirty();													// SVGA: tell the host what this pass wrote (the cursor included)
 	++TheFlushes;
 	TheFlushTimer.OneShot(NKern::TimerTicks(KFlushMs));
 	}
@@ -431,6 +480,25 @@ static void Dispi(TInt aIndex, TInt aVal)		{ Outw(0x1CE, (TUint16)aIndex); Outw(
 
 static void SetMode(TInt aW, TInt aH)
 	{
+	if (TheSvga)
+		{
+		// the SVGA registers own the mode (a DISPI write is ignored once SVGA is enabled): size + depth, the pitch the device reports,
+		// and the framebuffer must stay where the chunk is mapped (the first call is before the mapping: any address is taken)
+		TInt pitch;
+		TUint32 phys;
+		if (X64SvgaSetMode(aW, aH, pitch, phys, TheFbChunk ? TheFb.iPhys : 0))
+			{
+			TheFb.iPhys = phys;
+			TheFb.iWidth = aW;
+			TheFb.iHeight = aH;
+			TheFb.iPitch = pitch;
+			MarkDirty(0, 0, aW, aH);								// a new mode shows nothing until the host is told
+			return;
+			}
+		if (TheFbChunk)
+			return;													// a later mode the device refused: it kept the old one
+		TheSvga = EFalse;											// not even the first mode: stay on the VBE framebuffer + DISPI as before
+		}
 	const TUint16 id = Dispi(EDispiId);
 	if (id < 0xB0C0 || id > 0xB0CF || Dispi(EDispiXres) != TheFb.iWidth || Dispi(EDispiYres) != TheFb.iHeight)
 		{
@@ -531,9 +599,12 @@ void X64StartDisplay()
 	TheFb.iHeight = w[KX64SuperFbHeight];
 	TheFb.iBpp = w[KX64SuperFbFormat] & 0xFF;
 	TheFb.iRgb = (w[KX64SuperFbFormat] >> 8) & 1;
+	TheSvga = TheFb.iPhys && TheFb.iBpp == 32 && X64SvgaProbe();
 	if (TheFb.iPhys && TheFb.iBpp == 32 && XK_SCALE >= 1 && XK_SCREEN_W > 0 &&
 		((TInt)TheFb.iWidth != XK_SCREEN_W * XK_SCALE || (TInt)TheFb.iHeight != XK_SCREEN_H * XK_SCALE))
 		SetMode(XK_SCREEN_W * XK_SCALE, XK_SCREEN_H * XK_SCALE);
+	else if (TheSvga)
+		SetMode(TheFb.iWidth, TheFb.iHeight);						// the boot loader's size, but through the SVGA registers: they own the display from here on
 	X64FbW = X64ScreenW = TheFb.iWidth;
 	X64FbH = X64ScreenH = TheFb.iHeight;
 	if (XK_SCREEN_W > 0 && XK_SCREEN_W <= (TInt)TheFb.iWidth && XK_SCREEN_H > 0 && XK_SCREEN_H <= (TInt)TheFb.iHeight)
@@ -589,12 +660,12 @@ void X64StartDisplay()
 		memclr((TAny*)TheFbChunk->LinearAddress(), 256*1024);
 		// make_ekern.sh FBSHADOW=0|1 overrides the measurement (A/B testing); default -1 = decide.
 		// A scaled screen always has the shadow: the flusher is what scales (X4.35).
-		if (X64Scale > 1 || XK_DYNRES || XK_FB_SHADOW == 1 || (XK_FB_SHADOW < 0 && (fb[0]*4 < ram[0] || fb[1]*4 < ram[1])))
+		if (X64Scale > 1 || XK_DYNRES || TheSvga || XK_FB_SHADOW == 1 || (XK_FB_SHADOW < 0 && (fb[0]*4 < ram[0] || fb[1]*4 < ram[1])))
 			{
 			r = StartShadow();
 			Kern::Printf("[display] shadow screen at %08x (%s), flushed x%d every %d ms -> %d",
 							TheScreenChunk ? TheScreenChunk->LinearAddress() : 0,
-							X64Scale > 1 ? "scaled" : "slow framebuffer", X64Scale, KFlushMs, r);
+							X64Scale > 1 ? "scaled" : TheSvga ? "SVGA: the flusher reports the dirty rectangles" : "slow framebuffer", X64Scale, KFlushMs, r);
 			if (r != KErrNone)
 				{
 				TheScreenChunk = NULL;

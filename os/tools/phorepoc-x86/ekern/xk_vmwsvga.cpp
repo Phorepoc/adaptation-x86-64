@@ -9,8 +9,8 @@
 //     `svga` winsys asks the kernel for (DRM_VMW_GET_PARAM): guest-backed objects (MOBs), DX contexts (VGPU10 = GLES 3.0), SM5 (GL 4.1),
 //     GL43 (compute = GLES 3.1).
 // S1: "the device answers" -- the kernel half of the command path, as vmwgfx does it (vmwgfx_cmdbuf.c / vmwgfx_fifo.c), with our own code:
-//       * FIFO memory (BAR2) mapped and initialised (MIN/MAX/NEXT_CMD/STOP), SVGA_REG_ENABLE = ENABLE|HIDE (the device is on but the
-//         display stays on the VBE linear framebuffer the loader set up), TRACES off, CONFIG_DONE;
+//       * FIFO memory (BAR2) mapped and initialised (MIN/MAX/NEXT_CMD/STOP), SVGA_REG_ENABLE = ENABLE|HIDE (the device is on; the display driver
+//         then takes over the scan-out with its first mode set, see below), TRACES off, CONFIG_DONE;
 //       * the PCI INTx line bound, SVGA_REG_IRQMASK = COMMAND_BUFFER | ANY_FENCE (status port base+8, write-1-to-clear);
 //       * command buffers: a 64-byte-aligned SVGACBHeader in physically contiguous RAM, submitted by writing its physical address
 //         (| context id) to SVGA_REG_COMMAND_HIGH/LOW. First on the device context (0x3f): SVGA_DC_CMD_START_STOP_CONTEXT(enable, ctx 0);
@@ -22,6 +22,11 @@
 //     UPDATE_GB_IMAGE, and a SCREEN TARGET (DEFINE/BIND/UPDATE_GB_SCREENTARGET) that makes the host show it:
 //         [svga] S2: screen target shown
 //     The driver is a stub: single-threaded submission, the user API (RVmwSvgaChannel) is the LDD part of S2 (see below).
+// Scan-out: on this adapter the display driver (xk_display.cpp) does not use the Bochs DISPI registers. X64SvgaProbe() brings the device up before the
+//     display picks its framebuffer path; every mode (the first one and each host window resize) is programmed through SVGA_REG_WIDTH/HEIGHT/
+//     BITS_PER_PIXEL + ENABLE and the pitch is read back from SVGA_REG_BYTES_PER_LINE; and each flush of the display reports the rectangle it wrote
+//     with SVGA_CMD_UPDATE through the legacy FIFO (TVmwSvga::FifoWrite: ring between MIN and MAX, room checked against STOP, NEXT_CMD published
+//     after the words, host pinged through SVGA_FIFO_BUSY + SVGA_REG_SYNC). The host window repaints only what it is told about.
 // No-op (one log line) when the device is absent. Register numbers, capability and command-buffer layouts are Mesa's own MIT headers
 // (src/gallium/drivers/svga/include/svga_reg.h, svga3d_devcaps.h).
 #include <kernel/kern_priv.h>
@@ -40,7 +45,8 @@ static void PciWrite(TInt aDev, TInt aReg, TUint32 aVal)
 
 enum
 	{
-	KRegId = 0, KRegEnable = 1, KRegVramSize = 15, KRegCapabilities = 17, KRegMemStart = 18, KRegMemSize = 19, KRegConfigDone = 20,
+	KRegId = 0, KRegEnable = 1, KRegWidth = 2, KRegHeight = 3, KRegBitsPerPixel = 7, KRegBytesPerLine = 12, KRegFbStart = 13,
+	KRegFbOffset = 14, KRegSync = 21, KRegVramSize = 15, KRegCapabilities = 17, KRegMemStart = 18, KRegMemSize = 19, KRegConfigDone = 20,
 	KRegMemRegs = 30, KRegIrqMask = 33, KRegTraces = 45, KRegCommandLow = 48, KRegCommandHigh = 49, KRegMaxPrimaryMem = 50,
 	KRegSuggestedGbMemKb = 51, KRegDevCap = 52, KRegScreenTargetMaxW = 55, KRegScreenTargetMaxH = 56, KRegMobMaxSize = 57,
 	KRegCap2 = 59, KRegFifoCaps = 68, KRegFence = 69, KRegGbMemSizeKb = 76,
@@ -49,7 +55,7 @@ enum
 	KEnableEnable = 1, KEnableHide = 2,
 	KIrqAnyFence = 1 << 0, KIrqCommandBuffer = 1 << 3, KIrqError = 1 << 4,
 	KFifoMin = 0, KFifoMax = 1, KFifoNextCmd = 2, KFifoStop = 3, KFifoCaps = 4, KFifoFence = 6, KFifoNumRegs = 291,
-	KFifoCapFence = 1,
+	KFifoCapFence = 1, KFifoBusy = 290, KCmdUpdate = 1, KSyncGeneric = 1,
 	KCbContextDevice = 0x3f, KCbStatusNone = 0, KCbStatusCompleted = 1,
 	KDcCmdStartStopContext = 1, KCmdFence = 30,
 	KIrqStatusPort = 8,
@@ -84,6 +90,11 @@ class TVmwSvga
 	{
 public:
 	TInt Init();
+	TInt Probe();							// find + negotiate + FIFO up; idempotent (the display calls it before the 3D setup)
+	TBool SetMode(TInt aW, TInt aH, TInt& aPitch, TUint32& aFbPhys, TUint32 aExpectPhys);
+	TBool Update(TInt aX, TInt aY, TInt aW, TInt aH);
+	void Ping();
+	TBool FifoWrite(const TUint32* aWords, TInt aCount);
 	TUint32 DevCap(TUint32 aIdx)			{ Write(KRegDevCap, aIdx); return Read(KRegDevCap); }
 	TInt SubmitFromArena(TVmwSubmit& aSub);
 	static void Isr(TAny* aPtr);
@@ -124,7 +135,10 @@ public:
 	DMutex* iLock;
 	NTimer iTimer;
 	TUint32 iFence;
-	TVmwSvga() : iTimer(StepFn, this) {}
+	TInt iProbe;							// 0 = not tried, 1 = device up (FIFO configured), < 0 = no usable device
+	TBool iModeSet;							// the display owns the scan-out through the SVGA registers (ENABLE without HIDE)
+	TUint32 iUpdates, iUpdatesDropped, iFifoFullWaits;
+	TVmwSvga() : iTimer(StepFn, this), iProbe(0), iModeSet(EFalse), iUpdates(0), iUpdatesDropped(0), iFifoFullWaits(0) {}
 	};
 static TVmwSvga* TheSvga;
 
@@ -586,8 +600,106 @@ void TVmwSvga::StepFn(TAny* aPtr)
 		s.iTimer.OneShot(NKern::TimerTicks(25));
 	}
 
-TInt TVmwSvga::Init()
+// ---------------------------------------------------------------------------------------------------------------------------------------
+// Scan-out (the display's side, xk_display.cpp). Once SVGA_REG_ENABLE is set the device -- not the Bochs VBE "DISPI" registers -- owns the mode:
+// the host takes the size from SVGA_REG_WIDTH/HEIGHT/BITS_PER_PIXEL and the pitch from SVGA_REG_BYTES_PER_LINE, and DISPI writes are ignored (a
+// DISPI mode change after ENABLE leaves the host showing the old size at the wrong pitch). And the host window only repaints rectangles the guest
+// reports with SVGA_CMD_UPDATE through the FIFO (the legacy "update this rectangle of the framebuffer" command of the SVGA II programming model):
+// writing pixels into the framebuffer is not announced by itself. So on this device the display sets every mode through the registers and
+// reports each flush's dirty rectangle here.
+
+// The legacy FIFO (svga_reg.h SVGA_FIFO_*): a ring of dwords between MIN and MAX bytes, the guest writes at NEXT_CMD, the device consumes up to STOP.
+// A command may be written once there is room for all of it and one dword to spare (NEXT_CMD must never catch up with STOP: equal means empty).
+TBool TVmwSvga::FifoWrite(const TUint32* aWords, TInt aCount)
 	{
+	const TUint32 bytes = aCount * 4;
+	const TUint32 min = iFifo[KFifoMin], max = iFifo[KFifoMax];
+	TUint32 next = iFifo[KFifoNextCmd];
+	for (TInt tries = 0; ; ++tries)
+		{
+		const TUint32 stop = iFifo[KFifoStop];
+		const TUint32 room = (stop > next) ? stop - next - 4 : (max - next) + (stop - min) - 4;
+		if (room >= bytes)
+			break;
+		if (tries >= 20)
+			return EFalse;						// the device is not consuming: the caller keeps its dirty rectangle and tries again
+		++iFifoFullWaits;
+		Ping();									// wake the device's FIFO processing, then give it a tick
+		NKern::Sleep(NKern::TimerTicks(1));
+		}
+	for (TInt i = 0; i < aCount; ++i)
+		{
+		iFifo[next >> 2] = aWords[i];
+		next += 4;
+		if (next >= max)
+			next = min;
+		}
+	iFifo[KFifoNextCmd] = next;					// publish: the FIFO memory is mapped uncached, so the words above are already visible
+	Ping();
+	return ETrue;
+	}
+
+// vmw_fifo_ping_host: tell the device there is something in the FIFO (once per busy period -- the device clears FIFO_BUSY when it has drained it)
+void TVmwSvga::Ping()
+	{
+	if (!iFifo[KFifoBusy])
+		{
+		iFifo[KFifoBusy] = 1;
+		Write(KRegSync, KSyncGeneric);
+		}
+	}
+
+TBool TVmwSvga::Update(TInt aX, TInt aY, TInt aW, TInt aH)
+	{
+	if (iProbe <= 0 || !iModeSet || aW <= 0 || aH <= 0)
+		return ETrue;
+	const TUint32 cmd[5] = { KCmdUpdate, (TUint32)aX, (TUint32)aY, (TUint32)aW, (TUint32)aH };
+	if (!FifoWrite(cmd, 5))
+		{
+		++iUpdatesDropped;
+		return EFalse;
+		}
+	++iUpdates;
+	return ETrue;
+	}
+
+// Program a mode through the registers (vmw_kms_write_svga): size and depth, then ENABLE without HIDE; read back what the device made of it.
+// aExpectPhys != 0: the framebuffer address the caller already mapped -- a different address (FB_START + FB_OFFSET) refuses the mode.
+TBool TVmwSvga::SetMode(TInt aW, TInt aH, TInt& aPitch, TUint32& aFbPhys, TUint32 aExpectPhys)
+	{
+	if (iProbe <= 0)
+		return EFalse;
+	const TUint32 oldW = Read(KRegWidth), oldH = Read(KRegHeight), oldBpp = Read(KRegBitsPerPixel);
+	const TBool wasSet = iModeSet;
+	Write(KRegEnable, 0);						// the device derives its pitch and display size when it is enabled, not when the registers are written
+	Write(KRegWidth, aW);
+	Write(KRegHeight, aH);
+	Write(KRegBitsPerPixel, 32);
+	Write(KRegEnable, KEnableEnable);			// SVGA mode, display shown
+	const TUint32 w = Read(KRegWidth), h = Read(KRegHeight), bpp = Read(KRegBitsPerPixel), pitch = Read(KRegBytesPerLine);
+	const TUint32 phys = Read(KRegFbStart) + Read(KRegFbOffset);
+	Kern::Printf("[svga] mode %ux%u -> %ux%ux%u pitch %u, framebuffer %08x (VRAM %u KB)", aW, aH, w, h, bpp, pitch, phys, Read(KRegVramSize) >> 10);
+	if ((TInt)w != aW || (TInt)h != aH || bpp != 32 || pitch < w * 4u || (aExpectPhys && phys != aExpectPhys))
+		{
+		Kern::Printf("[svga] mode refused (size, depth, pitch or framebuffer address differ): back to %ux%ux%u", oldW, oldH, oldBpp);
+		Write(KRegWidth, oldW);
+		Write(KRegHeight, oldH);
+		Write(KRegBitsPerPixel, oldBpp);
+		Write(KRegEnable, wasSet ? KEnableEnable : KEnableEnable | KEnableHide);
+		return EFalse;
+		}
+	iModeSet = ETrue;
+	aPitch = pitch;
+	aFbPhys = phys;
+	return ETrue;
+	}
+
+// The device lookup, ID negotiation, capability report and FIFO set-up -- everything that needs no memory beyond the FIFO. Idempotent: the display
+// driver runs it first (it must know before it picks the framebuffer path), X64StartVmwSvga then finishes the 3D side.
+TInt TVmwSvga::Probe()
+	{
+	if (iProbe)
+		return iProbe > 0 ? KErrNone : iProbe;
 	iLock = NULL; iBase = 0; iIrqs = 0; iIrqBits = 0; iStep = 0; iWait = 0; iFence = 0; iVer = -1;
 	iDev = -1;
 	for (TInt d = 0; d < 32 && iDev < 0; ++d)
@@ -596,7 +708,7 @@ TInt TVmwSvga::Init()
 	if (iDev < 0)
 		{
 		Kern::Printf("[svga] no VMware SVGA II (15AD:0405) device -- no SVGA3D on this machine");
-		return KErrNotFound;
+		return iProbe = KErrNotFound;
 		}
 	const TUint32 bar0 = PciRead(iDev, 0x10), bar1 = PciRead(iDev, 0x14), bar2 = PciRead(iDev, 0x18);
 	PciWrite(iDev, 0x04, PciRead(iDev, 0x04) | 0x7);					// I/O + memory decode + bus master
@@ -604,22 +716,31 @@ TInt TVmwSvga::Init()
 	Kern::Printf("[svga] 15AD:0405 at 00:%02x.0 rev %02x subsys %08x, BAR0(io) %08x BAR1(fb) %08x BAR2(fifo) %08x",
 		iDev, PciRead(iDev, 8) & 0xFF, PciRead(iDev, 0x2C), bar0, bar1, bar2);
 	if (!(bar0 & 1))
-		return KErrNotSupported;
+		return iProbe = KErrNotSupported;
 	iVer = Negotiate();			// the value port is base+1 (a dword at an unaligned port); registers read 0 until the ID is accepted
 	if (iVer < 0)
 		{
 		Kern::Printf("[svga] ID negotiation failed");
-		return KErrNotSupported;
+		return iProbe = KErrNotSupported;
 		}
 	Report();
+	TInt r = InitFifo();
+	if (r != KErrNone)
+		return iProbe = r;
+	iProbe = 1;
+	return KErrNone;
+	}
+
+TInt TVmwSvga::Init()
+	{
+	TInt r = Probe();
+	if (r != KErrNone)
+		return r;
 	if (!(iCaps & KCapCmdBuffers) || !(iCaps & KCapGbObjects))
 		{
 		Kern::Printf("[svga] no command buffers / guest-backed objects: S1 not applicable");
 		return KErrNotSupported;
 		}
-	TInt r = InitFifo();
-	if (r != KErrNone)
-		return r;
 	r = Epoc::AllocPhysicalRam(KDmaBytes, iDmaPhys);
 	DPlatChunkHw* dma = NULL;
 	if (r == KErrNone)
@@ -652,9 +773,45 @@ TInt TVmwSvga::Init()
 	return KErrNone;
 	}
 
+static TVmwSvga* EnsureSvga()
+	{
+	if (!TheSvga)
+		TheSvga = new TVmwSvga;
+	return TheSvga;
+	}
+
 void X64StartVmwSvga()
 	{
-	TheSvga = new TVmwSvga;
-	if (TheSvga)
+	if (EnsureSvga())
 		TheSvga->Init();				// logs why it stops; the object stays (its timer is the self-test)
+	}
+
+// ---- the display driver's interface (xk_display.cpp) ----
+// X64SvgaProbe: is there a VMware SVGA II device (VirtualBox VMSVGA, VMware, QEMU -vga vmware) the display must drive through its registers?
+TBool X64SvgaProbe()
+	{
+	return EnsureSvga() && TheSvga->Probe() == KErrNone;
+	}
+
+TBool X64SvgaSetMode(TInt aW, TInt aH, TInt& aPitch, TUint32& aFbPhys, TUint32 aExpectPhys)
+	{
+	return TheSvga && TheSvga->SetMode(aW, aH, aPitch, aFbPhys, aExpectPhys);
+	}
+
+// one SVGA_CMD_UPDATE; EFalse = the FIFO had no room (the caller keeps the rectangle and reports it again with the next one)
+TBool X64SvgaUpdate(TInt aX, TInt aY, TInt aW, TInt aH)
+	{
+	return !TheSvga || TheSvga->Update(aX, aY, aW, aH);
+	}
+
+// bounded statistics for the display's periodic monitor line: updates sent, updates the FIFO could not take, waits for room, FIFO drained by the device
+void X64SvgaStats(TUint32& aSent, TUint32& aDropped, TUint32& aFullWaits, TBool& aDrained)
+	{
+	aSent = aDropped = aFullWaits = 0;
+	aDrained = ETrue;
+	if (TheSvga && TheSvga->iProbe > 0)
+		{
+		aSent = TheSvga->iUpdates;  aDropped = TheSvga->iUpdatesDropped;  aFullWaits = TheSvga->iFifoFullWaits;
+		aDrained = TheSvga->iFifo[KFifoStop] == TheSvga->iFifo[KFifoNextCmd];
+		}
 	}
