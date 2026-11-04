@@ -89,18 +89,18 @@ static TE1000* TheNic;
 
 TInt TE1000::Init()
 	{
-	TInt dev = -1;
-	for (TInt d=0; d<32 && dev<0; ++d)
-		{
-		const TUint32 id = XkPciRead(0, d, 0, 0);
-		const TUint32 did = id >> 16;						// 82540EM (QEMU, VBox MT Desktop), 82545EM, 82543GC
-		if ((id & 0xFFFF) == 0x8086 && (did == 0x100E || did == 0x100F || did == 0x1004))
-			dev = d;
-		}
+	// 82540EM (QEMU, VBox MT Desktop), 82545EM (VMware), 82543GC; on bus 0, or behind a bridge (VMware with PCIe root ports)
+	SPciLoc loc = { 0, 0, 0 };
+	static const TUint32 KIds[] = { 0x100E8086u, 0x100F8086u, 0x10048086u };
+	TBool found = EFalse;
+	for (TUint i = 0; i < sizeof(KIds) / sizeof(KIds[0]) && !found; ++i)
+		found = XkPciFind(KIds[i], -1, loc);
+	const TInt dev = found ? loc.iDev : -1;
+	const TInt bus = loc.iBus, fn = loc.iFn;
 	if (dev < 0)
 		return KErrNotFound;
-	const TUint32 bar0 = XkPciRead(0, dev, 0, 0x10) & ~0xFu;
-	XkPciWrite(0, dev, 0, 0x04, XkPciRead(0, dev, 0, 0x04) | 0x6);			// memory decode + bus master
+	const TUint32 bar0 = XkPciRead(bus, dev, fn, 0x10) & ~0xFu;
+	XkPciWrite(bus, dev, fn, 0x04, XkPciRead(bus, dev, fn, 0x04) | 0x6);			// memory decode + bus master
 	DPlatChunkHw* mmio;
 	TInt r = DPlatChunkHw::New(mmio, bar0, 0x20000, EMapAttrSupRw | EMapAttrFullyBlocking);
 	if (r != KErrNone)
@@ -144,7 +144,7 @@ TInt TE1000::Init()
 	SetReg(ERctl, KRctlEn | KRctlBam | KRctlSecrc);
 
 	iRxDfc.SetDfcQ(Kern::DfcQue0());
-	const TInt line = XkPciRead(0, dev, 0, 0x3C) & 0xFF;
+	const TInt line = XkPciRead(bus, dev, fn, 0x3C) & 0xFF;
 	iIrqId = (line > 0 && line < 16) ? (EX64IrqPciRouted | line) : -1;
 	TInt h = iIrqId >= 0 ? Interrupt::Bind(iIrqId, Isr, this) : KErrNotSupported;
 	if (h >= 0)
@@ -154,8 +154,8 @@ TInt TE1000::Init()
 		}
 	iLinkUp = (Reg(EStatus) & KStatusLu) != 0;
 	iPoll.OneShot(NKern::TimerTicks(100));					// safety net (and the only path without an IRQ)
-	Kern::Printf("[e1000] %08x at 00:%02x.0, MMIO %08x, MAC %02x:%02x:%02x:%02x:%02x:%02x, link %s, "
-					"irq: PIRQ-routed %d (bind %d)", XkPciRead(0, dev, 0, 0), dev, bar0, iMac[0], iMac[1], iMac[2],
+	Kern::Printf("[e1000] %08x at %02x:%02x.%d, MMIO %08x, MAC %02x:%02x:%02x:%02x:%02x:%02x, link %s, "
+					"irq: PIRQ-routed %d (bind %d)", XkPciRead(bus, dev, fn, 0), bus, dev, fn, bar0, iMac[0], iMac[1], iMac[2],
 					iMac[3], iMac[4], iMac[5], iLinkUp ? "up" : "down", line, h);
 	return KErrNone;
 	}

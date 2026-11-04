@@ -32,12 +32,32 @@ sound.autoDetect = "TRUE"
 
 svga.present = "TRUE"
 svga.vramSize = "134217728"
-mks.enable3d = "FALSE"
+mks.enable3d = "TRUE"
+svga.graphicsMemoryKB = "1048576"
 
 serial0.present = "TRUE"
 serial0.fileType = "file"
 serial0.fileName = "serial.log"
 serial0.yieldOnMsrRead = "TRUE"
 
-usb.present = "FALSE"
+# The PCI topology VMware's own machines declare (hardware version 19): a host bridge and four PCIe root ports. The xHCI
+# controller sits on a root port; without these lines VMware refuses to power on ("No PCIe slot available for usb_xhci").
+# The e1000, the sound and the SVGA devices stay on bus 0; the kernel's PCI scan follows bridges to the secondary buses.
+pciBridge0.present = "TRUE"
+pciBridge4.present = "TRUE"
+pciBridge4.virtualDev = "pcieRootPort"
+pciBridge4.functions = "8"
+pciBridge5.present = "TRUE"
+pciBridge5.virtualDev = "pcieRootPort"
+pciBridge5.functions = "8"
+pciBridge6.present = "TRUE"
+pciBridge6.virtualDev = "pcieRootPort"
+pciBridge6.functions = "8"
+pciBridge7.present = "TRUE"
+pciBridge7.virtualDev = "pcieRootPort"
+pciBridge7.functions = "8"
+
+usb.present = "TRUE"
+usb_xhci.present = "TRUE"
+usb_xhci.pciSlotNumber = "224"
 floppy0.present = "FALSE"

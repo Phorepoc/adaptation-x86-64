@@ -897,7 +897,7 @@ TInt THda::FormatFor(TInt aHz) const
 
 TInt THda::Init()
 	{
-	if (!XkPciFind(0, 0x0403, iLoc, 15))
+	if (!XkPciFind(0, 0x0403, iLoc))
 		return KErrNotFound;
 	const TInt b = iLoc.iBus, d = iLoc.iDev, f = iLoc.iFn;
 	iPciId = XkPciRead(b, d, f, 0);

@@ -26,32 +26,47 @@ static inline void XkPciWrite16(TInt aBus, TInt aDev, TInt aFn, TInt aReg, TUint
 
 struct SPciLoc { TInt iBus, iDev, iFn; };
 
+// A function is a PCI-PCI bridge when its header type (config dword 3, bits 22..16) is 1 and its class is 0x0604; its
+// secondary bus number is config dword 6, bits 15..8 (the firmware numbers the buses). VMware puts devices behind PCIe
+// root ports (pciBridge4..7: the xHCI controller, NVMe, vmxnet3, e1000e), so a scan of bus 0 alone misses them.
+static inline TBool XkPciIsBridge(TInt aBus, TInt aDev, TInt aFn)
+	{ return ((XkPciRead(aBus, aDev, aFn, 0x0C) >> 16) & 0x7F) == 1 && (XkPciRead(aBus, aDev, aFn, 8) >> 16) == 0x0604; }
+
 // The first function whose (device << 16 | vendor) is aVendorDevice (aClass < 0), or whose class and subclass
-// (config dword 8, bits 31..16: 0x0403 = multimedia audio device) are aClass. Scans buses 0..aMaxBus, every device,
-// every function of a multi-function device.
-static inline TBool XkPciFind(TUint32 aVendorDevice, TInt aClass, SPciLoc& aLoc, TInt aMaxBus = 0)
+// (config dword 8, bits 31..16: 0x0403 = multimedia audio device) are aClass. Scans bus 0 and then, depth first, the
+// secondary bus of every bridge it meets (buses up to aMaxBus), every device, every function of a multi-function
+// device. aDepth bounds the recursion (a misconfigured bridge that points back at its own bus).
+static inline TBool XkPciFindOn(TInt aBus, TUint32 aVendorDevice, TInt aClass, SPciLoc& aLoc, TInt aMaxBus, TInt aDepth)
 	{
-	for (TInt bus = 0; bus <= aMaxBus; ++bus)
-		for (TInt dev = 0; dev < 32; ++dev)
+	for (TInt dev = 0; dev < 32; ++dev)
+		{
+		const TUint32 id0 = XkPciRead(aBus, dev, 0, 0);
+		if ((id0 & 0xFFFF) == 0xFFFF)
+			continue;
+		const TInt fns = (XkPciRead(aBus, dev, 0, 0x0C) & 0x800000) ? 8 : 1;
+		for (TInt fn = 0; fn < fns; ++fn)
 			{
-			const TUint32 id0 = XkPciRead(bus, dev, 0, 0);
-			if ((id0 & 0xFFFF) == 0xFFFF)
+			const TUint32 id = fn ? XkPciRead(aBus, dev, fn, 0) : id0;
+			if ((id & 0xFFFF) == 0xFFFF)
 				continue;
-			const TInt fns = (XkPciRead(bus, dev, 0, 0x0C) & 0x800000) ? 8 : 1;
-			for (TInt fn = 0; fn < fns; ++fn)
+			const TBool hit = aClass >= 0 ? (TInt)(XkPciRead(aBus, dev, fn, 8) >> 16) == aClass : id == aVendorDevice;
+			if (hit)
 				{
-				const TUint32 id = fn ? XkPciRead(bus, dev, fn, 0) : id0;
-				if ((id & 0xFFFF) == 0xFFFF)
-					continue;
-				const TBool hit = aClass >= 0 ? (TInt)(XkPciRead(bus, dev, fn, 8) >> 16) == aClass : id == aVendorDevice;
-				if (hit)
-					{
-					aLoc.iBus = bus; aLoc.iDev = dev; aLoc.iFn = fn;
+				aLoc.iBus = aBus; aLoc.iDev = dev; aLoc.iFn = fn;
+				return ETrue;
+				}
+			if (aDepth > 0 && XkPciIsBridge(aBus, dev, fn))
+				{
+				const TInt sec = (TInt)((XkPciRead(aBus, dev, fn, 0x18) >> 8) & 0xFF);
+				if (sec > aBus && sec <= aMaxBus && XkPciFindOn(sec, aVendorDevice, aClass, aLoc, aMaxBus, aDepth - 1))
 					return ETrue;
-					}
 				}
 			}
+		}
 	return EFalse;
 	}
+
+static inline TBool XkPciFind(TUint32 aVendorDevice, TInt aClass, SPciLoc& aLoc, TInt aMaxBus = 255)
+	{ return XkPciFindOn(0, aVendorDevice, aClass, aLoc, aMaxBus, 8); }
 
 #endif
