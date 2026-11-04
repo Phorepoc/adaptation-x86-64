@@ -202,6 +202,7 @@ public:
 	TInt FormatFor(TInt aHz) const;
 	void SelfTest();
 	void SelfFeed();
+	void SelfRecord();
 	// interrupts, timers
 	static void Isr(TAny* aPtr);
 	static void DoneDfcFn(TAny* aPtr);
@@ -255,6 +256,9 @@ public:
 	TBool iSelfActive;
 	TUint8* iSelfBuf;
 	TInt iSelfTotal, iSelfOff, iSelfId, iSelfDone;
+	TInt iSelfRecQueued, iSelfRecDone, iSelfRecBytes;
+	TUint iSelfRecStart;
+	TBool iSelfRec;
 	THda() : iDoneDfc(DoneDfcFn, this, 1), iIdleDfc(IdleDfcFn, this, 1), iSelfDfc(SelfDfcFn, this, 1),
 			 iPoll(PollFn, this), iIdleTimer(IdleTimerFn, this) {}
 	};
@@ -353,6 +357,7 @@ TInt THda::ResetController()
 	Delay(1000);										// codecs need >= 521 us to announce themselves
 	for (TInt t = 0; t < 100 && !(R16(EStatests) & 0x7FFF); ++t)
 		Delay(1000);
+	Delay(10000);										// a second codec on the link (HDMI beside the analog one) answers a little later
 	return (R16(EStatests) & 0x7FFF) ? KErrNone : KErrNotFound;
 	}
 
@@ -1051,6 +1056,7 @@ void THda::IdleDown()
 
 void THda::ArmIdle()
 	{
+	iIdleTimer.Cancel();								// (a timer already running is restarted)
 	iIdleTimer.OneShot(NKern::TimerTicks(KIdleHoldOffMs));
 	}
 
@@ -1212,7 +1218,8 @@ void THda::TxStop()
 		HaltStream(s, ETrue);
 	s.iQHead = s.iQCount = 0;						// the LDD has given up on them: no callbacks
 	memclr(s.iRing, s.iBytes);
-	iPoll.Cancel();
+	if (!iRx.iRunning)
+		iPoll.Cancel();
 	ArmIdle();
 	}
 
@@ -1294,6 +1301,8 @@ void THda::TxDfc()
 				Kern::Printf("[hda] self-test: all pieces played (%d)", iSelfDone);
 				iSelfActive = EFalse;
 				TxStop();
+				if (iHasIn)
+					SelfRecord();
 				return;
 				}
 			}
@@ -1319,7 +1328,7 @@ void THda::RxStop()
 	if (s.iPrepared || s.iRunning)
 		HaltStream(s, ETrue);
 	s.iQHead = s.iQCount = 0;
-	if (!iTx.iPrepared)
+	if (!iTx.iRunning)
 		iPoll.Cancel();
 	ArmIdle();
 	}
@@ -1381,6 +1390,18 @@ void THda::RxDfc()
 			--s.iQCount;
 			if (iRxPdd)
 				Ldd_RecordCallback(iRxPdd, done.iId, KErrNone, done.iBytes);
+			else if (iSelfRec)
+				{
+				iSelfRecBytes += done.iBytes;
+				if (++iSelfRecDone == iSelfRecQueued)
+					{
+					Kern::Printf("[hda] self-test: recorded %d bytes in %d ticks (%d ms of audio at 48 kHz; a tick is 1 ms)", iSelfRecBytes,
+								 NKern::TickCount() - iSelfRecStart, iSelfRecBytes / 192);
+					iSelfRec = EFalse;
+					RxStop();
+					return;
+					}
+				}
 			}
 		}
 	}
@@ -1613,6 +1634,19 @@ void THda::SelfTest()
 	iSelfOff = iSelfId = iSelfDone = 0;
 	Kern::Printf("[hda] self-test: 1 s of 440 Hz queued through the ring");
 	iSelfDfc.Add();										// the feeding runs on the audio DFC thread, like the LDD's calls
+	}
+
+// the record leg: 8 pieces of 4096 bytes through the input stream, paced by the link (the capture backend of the VM
+// may deliver silence; what is checked is that the DMA runs at the audio rate and every piece completes)
+void THda::SelfRecord()
+	{
+	iSelfRecQueued = 8;
+	iSelfRecDone = iSelfRecBytes = 0;
+	iSelfRec = ETrue;
+	RxStart();
+	iSelfRecStart = NKern::TickCount();
+	for (TInt i = 0; i < iSelfRecQueued; ++i)
+		RxQueue(100 + i, iSelfBuf + i * 4096, 4096);
 	}
 
 void THda::SelfFeed()

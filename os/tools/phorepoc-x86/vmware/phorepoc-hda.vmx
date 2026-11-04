@@ -1,0 +1,43 @@
+.encoding = "UTF-8"
+# VMware Workstation machine for the Phorepoc PC image: HD Audio ("hdaudio"), e1000, the VMware SVGA adapter, IDE.
+# Copy it next to the files it names and open it (File > Open); no settings need changing.
+#   phorepoc-ekern.iso   the kernel + ROM ISO ("phe image recipe kernel -b pc": <build>/x86/ekern/phorepoc-ekern.iso)
+#   phorepoc-disk.vmdk   the C: disk. Make a blank one in Workstation (Hard Disk, IDE, 256 MB, single file) or
+#                        convert a raw image: vmware-vdiskmanager / qemu-img convert -O vmdk
+#   serial.log           the kernel's log (COM1): the "[hda]" lines say which controller, codec and pins the driver
+#                        found. For the whole widget graph build the kernel with HDADUMP=1.
+config.version = "8"
+virtualHW.version = "19"
+displayName = "Phorepoc OS"
+guestOS = "other-64"
+firmware = "bios"
+memsize = "1024"
+numvcpus = "2"
+
+ide0:0.present = "TRUE"
+ide0:0.fileName = "phorepoc-disk.vmdk"
+ide1:0.present = "TRUE"
+ide1:0.deviceType = "cdrom-image"
+ide1:0.fileName = "phorepoc-ekern.iso"
+bios.bootOrder = "cdrom"
+
+ethernet0.present = "TRUE"
+ethernet0.virtualDev = "e1000"
+ethernet0.connectionType = "nat"
+ethernet0.addressType = "generated"
+
+sound.present = "TRUE"
+sound.virtualDev = "hdaudio"
+sound.autoDetect = "TRUE"
+
+svga.present = "TRUE"
+svga.vramSize = "134217728"
+mks.enable3d = "FALSE"
+
+serial0.present = "TRUE"
+serial0.fileType = "file"
+serial0.fileName = "serial.log"
+serial0.yieldOnMsrRead = "TRUE"
+
+usb.present = "FALSE"
+floppy0.present = "FALSE"
