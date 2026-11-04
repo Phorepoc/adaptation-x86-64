@@ -99,6 +99,7 @@ public:
 	TUint32 RegRead(TUint32 aIdx)			{ return Read(aIdx); }
 	TInt SubmitChannel(class DVmwSvgaChannel& aCh, TVmwSubmit& aSub);
 	TInt KernelCmd(const TUint32* aWords, TInt aCount, TUint32 aContext, TUint32 aFlags = 0, TUint32 aDxContext = 0);
+	void ScanoutDrop();
 	TInt EnsureObjectTables();
 	TInt BuildTable(class TVmwPool& aPool, TInt aOff, TInt aSize, TUint32& aDepth, TUint64& aBase, TInt*& aPtPages, TInt& aPtCount);
 	TInt PtAlloc();
@@ -146,10 +147,14 @@ public:
 	TInt iOtablesUp;						// 0 = not set up, 1 = up, < 0 = failed
 	TUint32 iPtUsed[1024 / 32];				// page-table pages of iKPool (KPtPageBase ..): in use
 	TUint32 iSlots;							// channel id windows in use (bit per slot)
+	TUint32 iCbSpins, iCbTicks;
 	TUint32 iCbs, iCbSleeps;				// client command buffers run / timer ticks slept waiting for them (statistics)
 	TBool iModeSet;							// the display owns the scan-out through the SVGA registers (ENABLE without HIDE)
 	TUint32 iUpdates, iUpdatesDropped, iFifoFullWaits;
-	TVmwSvga() : iTimer(StepFn, this), iProbe(0), iKPool(NULL), iOtablesUp(0), iSlots(0), iCbs(0), iCbSleeps(0), iModeSet(EFalse), iUpdates(0), iUpdatesDropped(0), iFifoFullWaits(0)
+	TInt iModeW, iModeH;					// the display mode the registers hold
+	volatile TInt iScanout;					// 1 = a GPU screen target (a client's render target) is what the host shows (see ScanoutDrop)
+	TUint32 iScanoutDrops;
+	TVmwSvga() : iTimer(StepFn, this), iProbe(0), iKPool(NULL), iOtablesUp(0), iSlots(0), iCbSpins(0), iCbTicks(0), iCbs(0), iCbSleeps(0), iModeSet(EFalse), iModeW(0), iModeH(0), iScanout(0), iScanoutDrops(0), iUpdates(0), iUpdatesDropped(0), iFifoFullWaits(0)
 		{ memclr(iPtUsed, sizeof(iPtUsed)); }
 	};
 static TVmwSvga* TheSvga;
@@ -618,6 +623,8 @@ TInt DVmwSvgaChannel::Request(TInt aReqNo, TAny* a1, TAny*)
 		info.iDevCaps[0] = s.DevCap(0); info.iDevCaps[1] = s.DevCap(95); info.iDevCaps[2] = s.DevCap(244);
 		info.iDevCaps[3] = s.DevCap(258); info.iDevCaps[4] = s.DevCap(261); info.iDevCaps[5] = s.DevCap(19);
 		info.iMobMaxKb = s.RegRead(KRegMobMaxSize) >> 10;
+		info.iDisplayW = s.iModeW;
+		info.iDisplayH = s.iModeH;
 		Kern::MutexSignal(*s.iLock);
 		NKern::ThreadLeaveCS();
 		info.iPoolBytes = KPoolBytes;
@@ -626,6 +633,20 @@ TInt DVmwSvgaChannel::Request(TInt aReqNo, TAny* a1, TAny*)
 		info.iCtxBase = CtxBase(); info.iCtxCount = KCtxPerSlot;
 		TPckgC<TVmwSvgaInfo> p(info);
 		return Kern::ThreadDesWrite(t, a1, p, 0, KChunkShiftBy0, NULL);
+		}
+	case EVmwCtrlScanout:
+		{
+		// a1 = 0: the client took its screen target down (the framebuffer shows again: repaint it), 1: it defined one, 2: query
+		const TInt op = (TInt)a1;
+		if (op == 1)
+			s.iScanout = 1;
+		else if (op == 0 && s.iScanout)
+			{
+			s.iScanout = 0;
+			const TUint32 full[5] = { KCmdUpdate, 0, 0, (TUint32)s.iModeW, (TUint32)s.iModeH };
+			s.FifoWrite(full, 5);
+			}
+		return s.iScanout;
 		}
 	case EVmwCtrlGetDevCaps:
 		{
@@ -971,9 +992,10 @@ TInt TVmwSvga::SubmitChannel(DVmwSvgaChannel& aCh, TVmwSubmit& aSub)
 	h->iStatus = KCbStatusNone;
 	Write(KRegCommandHigh, 0);
 	Write(KRegCommandLow, HdrPhys(slot) | (aSub.iContext & 0x3f));
-	TInt waited = 0;
+	TInt waited = 0, spins = 0;
+	const TUint32 tick0 = NKern::TickCount();
 	// the host usually answers within microseconds: poll first (a sleep costs a whole timer tick), then give the CPU away
-	for (TInt spin = 0; spin < 4000 && h->iStatus == KCbStatusNone; ++spin)
+	for (; spins < 4000 && h->iStatus == KCbStatusNone; ++spins)
 		Kern::NanoWait(1000);
 	while (h->iStatus == KCbStatusNone && waited < 2000)
 		{
@@ -982,6 +1004,13 @@ TInt TVmwSvga::SubmitChannel(DVmwSvgaChannel& aCh, TVmwSubmit& aSub)
 		}
 	++iCbs;
 	iCbSleeps += waited;
+	iCbSpins += spins;
+	iCbTicks += NKern::TickCount() - tick0;
+	if (iCbs % 240 == 0)
+		{
+		Kern::Printf("[svga] %u command buffers: polled %u us (avg %u), slept %u ticks, %u ms waiting in all, %u irqs", iCbs, iCbSpins, iCbSpins / 240, iCbSleeps, iCbTicks, iIrqs);
+		iCbSpins = 0; iCbTicks = 0;
+		}
 	aSub.iStatus = h->iStatus;
 	aSub.iErrorOffset = h->iErrorOffset;
 	Kern::MutexSignal(*iLock);
@@ -1180,10 +1209,36 @@ void TVmwSvga::Ping()
 		}
 	}
 
+// A client (Mesa's svga driver, a full-screen GL window) made its render target the display: a screen target replaces the whole VM display
+// while it exists (S2), so what WSERV composes into the framebuffer is invisible. The display driver is the arbiter of what is on screen:
+// the moment it reports a rectangle (WSERV drew something: a note, a status change, a window that is not full-screen any more, the
+// pointer), the screen target goes and the host shows the framebuffer again -- all of it, repainted here. The client sees iScanout drop
+// to 0 (EVmwCtrlScanout, query) and presents through the window server until it takes the display over again.
+void TVmwSvga::ScanoutDrop()
+	{
+	NKern::ThreadEnterCS();
+	Kern::MutexWait(*iLock);
+	if (iScanout)
+		{
+		const TUint32 cmd[3] = { KCmdDestroyGbScreenTarget, 4, 0 };
+		KernelCmd(cmd, 3, 0);
+		iScanout = 0;
+		++iScanoutDrops;
+		if (iScanoutDrops <= 8)
+			Kern::Printf("[svga] scan-out dropped (#%u): the window server drew something; the host shows the framebuffer again", iScanoutDrops);
+		}
+	Kern::MutexSignal(*iLock);
+	NKern::ThreadLeaveCS();
+	const TUint32 full[5] = { KCmdUpdate, 0, 0, (TUint32)iModeW, (TUint32)iModeH };
+	FifoWrite(full, 5);
+	}
+
 TBool TVmwSvga::Update(TInt aX, TInt aY, TInt aW, TInt aH)
 	{
 	if (iProbe <= 0 || !iModeSet || aW <= 0 || aH <= 0)
 		return ETrue;
+	if (iScanout)
+		ScanoutDrop();							// something the CPU composed changed on screen: the GPU frame is no longer the whole picture
 	const TUint32 cmd[5] = { KCmdUpdate, (TUint32)aX, (TUint32)aY, (TUint32)aW, (TUint32)aH };
 	if (!FifoWrite(cmd, 5))
 		{
@@ -1219,6 +1274,8 @@ TBool TVmwSvga::SetMode(TInt aW, TInt aH, TInt& aPitch, TUint32& aFbPhys, TUint3
 		Write(KRegEnable, wasSet ? KEnableEnable : KEnableEnable | KEnableHide);
 		return EFalse;
 		}
+	iModeW = (TInt)w;
+	iModeH = (TInt)h;
 	iModeSet = ETrue;
 	aPitch = pitch;
 	aFbPhys = phys;

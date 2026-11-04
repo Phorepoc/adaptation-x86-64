@@ -46,6 +46,7 @@ struct TVmwSvgaInfo
 	TUint32 iSurfBase, iSurfCount;	// ... of surface ids
 	TUint32 iCtxBase, iCtxCount;	// ... of DX context ids
 	TUint32 iMobMaxKb;			// SVGA_REG_MOB_MAX_SIZE in KB
+	TUint32 iDisplayW, iDisplayH;	// the display mode (0 = the display is not driven through the SVGA registers)
 	};
 
 struct TVmwSubmit
@@ -78,7 +79,7 @@ struct TVmwMob
 	};
 
 enum TVmwSvgaControl { EVmwCtrlGetInfo, EVmwCtrlOpenArena, EVmwCtrlSubmit, EVmwCtrlGetDevCaps, EVmwCtrlOpenPool, EVmwCtrlPoolCommit,
-	EVmwCtrlDefineMob, EVmwCtrlDestroyMob };
+	EVmwCtrlDefineMob, EVmwCtrlDestroyMob, EVmwCtrlScanout };
 
 #ifndef __KERNEL_MODE__
 class RVmwSvgaChannel : public RBusLogicalChannel
@@ -93,6 +94,9 @@ public:
 	inline TInt PoolCommit(TInt aOffset, TInt aSize) { TVmwPoolRange r = { aOffset, aSize }; TPckg<TVmwPoolRange> p(r); return DoControl(EVmwCtrlPoolCommit, &p); }
 	inline TInt DefineMob(TUint32 aMobId, TInt aOffset, TInt aSize) { TVmwMob m = { aMobId, aOffset, aSize }; TPckg<TVmwMob> p(m); return DoControl(EVmwCtrlDefineMob, &p); }
 	inline TInt DestroyMob(TUint32 aMobId) { TVmwMob m = { aMobId, 0, 0 }; TPckg<TVmwMob> p(m); return DoControl(EVmwCtrlDestroyMob, &p); }
+	// the client's screen target is the display: 1 = it defined one, 0 = it took it down, 2 = ask. Returns 1 while it is the display, 0 once it is not
+	// (the display driver takes it down itself as soon as the window server draws anything: see TVmwSvga::ScanoutDrop)
+	inline TInt Scanout(TInt aOp) { return DoControl(EVmwCtrlScanout, (TAny*)aOp); }
 	inline TInt Submit(TVmwSubmit& aSub) { TPckg<TVmwSubmit> p(aSub); return DoControl(EVmwCtrlSubmit, &p); }
 	};
 #endif
