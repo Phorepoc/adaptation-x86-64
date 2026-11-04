@@ -96,7 +96,13 @@ public:
 	void Ping();
 	TBool FifoWrite(const TUint32* aWords, TInt aCount);
 	TUint32 DevCap(TUint32 aIdx)			{ Write(KRegDevCap, aIdx); return Read(KRegDevCap); }
-	TInt SubmitFromArena(TVmwSubmit& aSub);
+	TUint32 RegRead(TUint32 aIdx)			{ return Read(aIdx); }
+	TInt SubmitChannel(class DVmwSvgaChannel& aCh, TVmwSubmit& aSub);
+	TInt KernelCmd(const TUint32* aWords, TInt aCount, TUint32 aContext, TUint32 aFlags = 0, TUint32 aDxContext = 0);
+	TInt EnsureObjectTables();
+	TInt BuildTable(class TVmwPool& aPool, TInt aOff, TInt aSize, TUint32& aDepth, TUint64& aBase, TInt*& aPtPages, TInt& aPtCount);
+	TInt PtAlloc();
+	void PtFree(TInt aPage);
 	static void Isr(TAny* aPtr);
 	static void StepFn(TAny* aPtr);
 private:
@@ -136,18 +142,354 @@ public:
 	NTimer iTimer;
 	TUint32 iFence;
 	TInt iProbe;							// 0 = not tried, 1 = device up (FIFO configured), < 0 = no usable device
+	class TVmwPool* iKPool;					// S3: the device-wide object tables (OTables) and the page-table pages of the MOBs (pool: kernel-owned)
+	TInt iOtablesUp;						// 0 = not set up, 1 = up, < 0 = failed
+	TUint32 iPtUsed[1024 / 32];				// page-table pages of iKPool (KPtPageBase ..): in use
+	TUint32 iSlots;							// channel id windows in use (bit per slot)
+	TUint32 iCbs, iCbSleeps;				// client command buffers run / timer ticks slept waiting for them (statistics)
 	TBool iModeSet;							// the display owns the scan-out through the SVGA registers (ENABLE without HIDE)
 	TUint32 iUpdates, iUpdatesDropped, iFifoFullWaits;
-	TVmwSvga() : iTimer(StepFn, this), iProbe(0), iModeSet(EFalse), iUpdates(0), iUpdatesDropped(0), iFifoFullWaits(0) {}
+	TVmwSvga() : iTimer(StepFn, this), iProbe(0), iKPool(NULL), iOtablesUp(0), iSlots(0), iCbs(0), iCbSleeps(0), iModeSet(EFalse), iUpdates(0), iUpdatesDropped(0), iFifoFullWaits(0)
+		{ memclr(iPtUsed, sizeof(iPtUsed)); }
 	};
 static TVmwSvga* TheSvga;
 
 // ---------------------------------------------------------------------------------------------------------------------------------------
-// S2: the user API -- the logical device "VmwSvga" (rvmwsvgachannel.h), the Symbian counterpart of the DRM_VMW_* ioctls the Mesa `svga` winsys
-// uses. Same shape as RMaliChannel: the channel hands the client the ARENA (the 2 MB physically contiguous DMA block as a shared chunk, so the
-// client writes MOB contents, object tables and command streams straight into it), and Submit runs one command buffer out of it. The kernel owns the
-// command-buffer HEADERS (a client cannot forge one) and bounds-checks the command range. No validation of the command stream itself (a single
-// trusted channel, as the Mali driver). The device is installed from the extension entry: Open needs no User::LoadLogicalDevice.
+// S2/S3: the user API -- the logical device "VmwSvga" (rvmwsvgachannel.h), the Symbian counterpart of the DRM_VMW_* ioctls the Mesa `svga` winsys
+// uses. Same shape as RMaliChannel: the channel hands the client its ARENA (a physically contiguous block as a shared chunk: the command staging
+// area), Submit runs one command buffer out of it, and (S3) a POOL: a large shared chunk committed page by page from any RAM, whose ranges are
+// the device's guest-backed memory (MOBs). The kernel owns the command-buffer HEADERS (a client cannot forge one), the device-wide object tables
+// (OTables), the MOB page tables and the object-id windows of each channel; it bounds-checks the command range but does not validate the stream
+// (a single trusted channel, as the Mali driver). The device is installed from the extension entry: Open needs no User::LoadLogicalDevice.
+
+const TInt KPoolBytes = 256 << 20;				// a channel's pool: address space (physical pages are committed on demand)
+const TInt KKPoolBytes = 8 << 20;				// the kernel's own pool: the OTables, then the page-table pages
+const TInt KPtPageBase = 1024, KPtPages = 1024;	// page-table pages of the MOBs: pages 1024 .. 2047 of the kernel pool (4 MB .. 8 MB)
+const TInt KArenaBytes = 2 << 20, KArenaMin = 512 << 10;
+const TInt KIdSlots = 16, KIdStride = 2048;		// ids of one channel: slot * 2048 + 1 ..
+const TInt KMobsPerSlot = KIdStride - 1, KSurfsPerSlot = KIdStride - 1, KCtxPerSlot = 15;
+const TInt KCtxStride = 16;
+const TInt KHdrSlotChannel = 16, KHdrSlotKernel = 9;
+// OTables in the kernel pool (entry sizes: MOB 16, surface 64; the others have room to spare): MOB 32768 entries, surface 32768, the rest 1024
+enum
+	{
+	KOtMobOff = 0, KOtMobBytes = 0x100000, KOtSurfOff = 0x100000, KOtSurfBytes = 0x200000, KOtCtxOff = 0x300000, KOtShaderOff = 0x310000,
+	KOtStOff = 0x320000, KOtDxOff = 0x330000, KOtSmallBytes = 0x10000, KOtEnd = 0x340000,
+	KCmdDestroyGbMob = 1094, KCmdDestroyGbSurface = 1098, KCmdDxDestroyContext = 1144,
+	KMobFmtPt64d1 = 5, KMobFmtPt64d2 = 6
+	};
+
+// guest memory for the device: a shared chunk the client maps, whose pages are committed here (any RAM, zeroed), or one contiguous block
+class TVmwPool
+	{
+public:
+	static TVmwPool* New(TInt aBytes, TBool aContiguous);
+	TInt Commit(TInt aOff, TInt aSize);
+	TBool Committed(TInt aOff, TInt aSize) const;
+	TUint8* Addr(TInt aOff, TInt aSize);
+	TPhysAddr Phys(TInt aPage) const				{ return iPhys[aPage]; }
+	void Release();									// the owner lets go; the pages are freed when the last user mapping is gone
+	static void DestroyedFn(TAny* aPtr);
+	TVmwPool() : iDfc(DestroyedFn, this, Kern::DfcQue0(), 1) {}
+	DChunk* iChunk;
+	TInt iBytes, iPages;
+	TPhysAddr* iPhys;
+	TPhysAddr iBlock;								// contiguous: the block (iPhys then holds each page of it)
+	TDfc iDfc;
+	};
+
+TVmwPool* TVmwPool::New(TInt aBytes, TBool aContiguous)
+	{
+	TVmwPool* p = new TVmwPool;
+	if (!p)
+		return NULL;
+	p->iBytes = aBytes;
+	p->iPages = aBytes >> 12;
+	p->iBlock = 0;
+	p->iChunk = NULL;
+	p->iPhys = (TPhysAddr*)Kern::AllocZ(p->iPages * sizeof(TPhysAddr));
+	if (!p->iPhys)
+		{
+		delete p;
+		return NULL;
+		}
+	TChunkCreateInfo info;
+	info.iType = TChunkCreateInfo::ESharedKernelMultiple;
+	info.iMaxSize = aBytes;
+	info.iMapAttr = EMapAttrCachedMax;				// x86 DMA is cache-coherent
+	info.iOwnsMemory = EFalse;						// the RAM is ours, not the chunk's
+	info.iDestroyedDfc = &p->iDfc;
+	TLinAddr lin;
+	TUint32 attr;
+	TInt r = Kern::ChunkCreate(info, p->iChunk, lin, attr);
+	if (r != KErrNone)
+		{
+		Kern::Free(p->iPhys);
+		delete p;
+		return NULL;
+		}
+	if (aContiguous)
+		{
+		r = Epoc::AllocPhysicalRam(aBytes, p->iBlock);
+		if (r == KErrNone)
+			r = Kern::ChunkCommitPhysical(p->iChunk, 0, aBytes, p->iBlock);
+		if (r == KErrNone)
+			{
+			TLinAddr ka;
+			if (Kern::ChunkAddress(p->iChunk, 0, aBytes, ka) == KErrNone)
+				memclr((TAny*)ka, aBytes);
+			for (TInt i = 0; i < p->iPages; ++i)
+				p->iPhys[i] = p->iBlock + (i << 12);
+			}
+		else
+			{
+			if (p->iBlock)
+				Epoc::FreePhysicalRam(p->iBlock, aBytes);
+			p->iBlock = 0;
+			p->Release();							// (frees the object through the DFC when the chunk goes)
+			return NULL;
+			}
+		}
+	return p;
+	}
+
+TBool TVmwPool::Committed(TInt aOff, TInt aSize) const
+	{
+	if (aOff < 0 || aSize <= 0 || (aOff & 0xFFF) || aOff + aSize > iBytes)
+		return EFalse;
+	for (TInt p = aOff >> 12, e = (aOff + aSize + 0xFFF) >> 12; p < e; ++p)
+		if (!iPhys[p])
+			return EFalse;
+	return ETrue;
+	}
+
+TInt TVmwPool::Commit(TInt aOff, TInt aSize)
+	{
+	if (aOff < 0 || aSize <= 0 || (aOff & 0xFFF) || aOff + aSize > iBytes || iBlock)
+		return KErrArgument;
+	const TInt first = aOff >> 12, end = (aOff + aSize + 0xFFF) >> 12;
+	for (TInt p = first; p < end;)
+		{
+		if (iPhys[p])
+			{
+			++p;
+			continue;
+			}
+		TInt q = p;
+		while (q < end && !iPhys[q])
+			++q;
+		const TInt n = q - p;
+		TPhysAddr* list = (TPhysAddr*)Kern::Alloc(n * sizeof(TPhysAddr));
+		if (!list)
+			return KErrNoMemory;
+		TInt r = Epoc::AllocPhysicalRam(n, list);
+		if (r == KErrNone)
+			{
+			r = Kern::ChunkCommitPhysical(iChunk, p << 12, n << 12, list);
+			if (r != KErrNone)
+				Epoc::FreePhysicalRam(n, list);
+			}
+		if (r != KErrNone)
+			{
+			Kern::Free(list);
+			return r;
+			}
+		for (TInt i = 0; i < n; ++i)
+			iPhys[p + i] = list[i];
+		Kern::Free(list);
+		TLinAddr ka;
+		r = Kern::ChunkAddress(iChunk, p << 12, n << 12, ka);
+		if (r != KErrNone)
+			return r;
+		memclr((TAny*)ka, n << 12);
+		p = q;
+		}
+	return KErrNone;
+	}
+
+TUint8* TVmwPool::Addr(TInt aOff, TInt aSize)
+	{
+	TLinAddr ka;
+	return Kern::ChunkAddress(iChunk, aOff, aSize, ka) == KErrNone ? (TUint8*)ka : NULL;
+	}
+
+void TVmwPool::Release()
+	{
+	if (iChunk)
+		{
+		DChunk* c = iChunk;
+		iChunk = NULL;
+		Kern::ChunkClose(c);					// the destroyed-DFC frees the pages and this object when the chunk is gone
+		}
+	else
+		DestroyedFn(this);
+	}
+
+void TVmwPool::DestroyedFn(TAny* aPtr)
+	{
+	TVmwPool* p = (TVmwPool*)aPtr;
+	NKern::ThreadEnterCS();
+	if (p->iBlock)
+		Epoc::FreePhysicalRam(p->iBlock, p->iBytes);
+	else if (p->iPhys)
+		{
+		// free in runs of at most 256 pages
+		TPhysAddr list[256];
+		TInt n = 0;
+		for (TInt i = 0; i < p->iPages; ++i)
+			if (p->iPhys[i])
+				{
+				list[n++] = p->iPhys[i];
+				if (n == 256)
+					{
+					Epoc::FreePhysicalRam(n, list);
+					n = 0;
+					}
+				}
+		if (n)
+			Epoc::FreePhysicalRam(n, list);
+		}
+	Kern::Free(p->iPhys);
+	delete p;
+	NKern::ThreadLeaveCS();
+	}
+
+// a MOB or object table as the device walks it: one contiguous range, else PT64 depth 1 (<= 512 pages) or depth 2 (page-table pages from the kernel pool)
+TInt TVmwSvga::PtAlloc()
+	{
+	for (TInt i = 0; i < KPtPages; ++i)
+		if (!(iPtUsed[i >> 5] & (1u << (i & 31))))
+			{
+			const TInt page = KPtPageBase + i;
+			if (iKPool->Commit(page << 12, 0x1000) != KErrNone)
+				return -1;
+			iPtUsed[i >> 5] |= 1u << (i & 31);
+			return page;
+			}
+	return -1;
+	}
+
+void TVmwSvga::PtFree(TInt aPage)
+	{
+	const TInt i = aPage - KPtPageBase;
+	iPtUsed[i >> 5] &= ~(1u << (i & 31));
+	}
+
+TInt TVmwSvga::BuildTable(TVmwPool& aPool, TInt aOff, TInt aSize, TUint32& aDepth, TUint64& aBase, TInt*& aPtPages, TInt& aPtCount)
+	{
+	aPtPages = NULL;
+	aPtCount = 0;
+	const TInt n = (aSize + 0xFFF) >> 12, p0 = aOff >> 12;
+	TBool contiguous = ETrue;
+	for (TInt i = 1; i < n && contiguous; ++i)
+		contiguous = aPool.Phys(p0 + i) == aPool.Phys(p0) + (i << 12);
+	if (contiguous)
+		{
+		aDepth = KMobFmtRange;
+		aBase = (TUint64)aPool.Phys(p0) >> 12;
+		return KErrNone;
+		}
+	const TInt l1 = (n + 511) / 512;
+	const TInt count = n <= 512 ? 1 : 1 + l1;
+	if (l1 > 512)
+		return KErrTooBig;
+	TInt* pages = (TInt*)Kern::Alloc(count * sizeof(TInt));
+	if (!pages)
+		return KErrNoMemory;
+	for (TInt i = 0; i < count; ++i)
+		{
+		pages[i] = PtAlloc();
+		if (pages[i] < 0)
+			{
+			while (--i >= 0)
+				PtFree(pages[i]);
+			Kern::Free(pages);
+			return KErrNoMemory;
+			}
+		}
+	if (n <= 512)
+		{
+		TUint64* e = (TUint64*)iKPool->Addr(pages[0] << 12, 0x1000);
+		memclr(e, 0x1000);
+		for (TInt i = 0; i < n; ++i)
+			e[i] = (TUint64)aPool.Phys(p0 + i) >> 12;
+		aDepth = KMobFmtPt64d1;
+		}
+	else
+		{
+		TUint64* root = (TUint64*)iKPool->Addr(pages[0] << 12, 0x1000);
+		memclr(root, 0x1000);
+		for (TInt j = 0; j < l1; ++j)
+			{
+			root[j] = (TUint64)iKPool->Phys(pages[1 + j]) >> 12;
+			TUint64* e = (TUint64*)iKPool->Addr(pages[1 + j] << 12, 0x1000);
+			memclr(e, 0x1000);
+			for (TInt i = 0; i < 512 && j * 512 + i < n; ++i)
+				e[i] = (TUint64)aPool.Phys(p0 + j * 512 + i) >> 12;
+			}
+		aDepth = KMobFmtPt64d2;
+		}
+	aBase = (TUint64)iKPool->Phys(pages[0]) >> 12;
+	aPtPages = pages;
+	aPtCount = count;
+	return KErrNone;
+	}
+
+// a command the kernel itself issues (MOB and OTable management), through its own command-buffer slot; the caller holds iLock
+TInt TVmwSvga::KernelCmd(const TUint32* aWords, TInt aCount, TUint32 aContext, TUint32 aFlags, TUint32 aDxContext)
+	{
+	if (aCount * 4 > KCmdSlotBytes)
+		return KErrTooBig;
+	memcpy(Cmd(KHdrSlotKernel), aWords, aCount * 4);
+	Submit(KHdrSlotKernel, aContext, aCount * 4, aFlags, aDxContext);
+	TInt waited = 0;
+	for (TInt spin = 0; spin < 4000 && !Done(KHdrSlotKernel); ++spin)
+		Kern::NanoWait(1000);
+	while (!Done(KHdrSlotKernel) && waited < 2000)
+		{
+		NKern::Sleep(NKern::TimerTicks(1));
+		++waited;
+		}
+	const TUint32 st = Hdr(KHdrSlotKernel)->iStatus;
+	if (st != KCbStatusCompleted)
+		{
+		Kern::Printf("[svga] kernel command %u: status %u error offset %u", aWords[0], st, Hdr(KHdrSlotKernel)->iErrorOffset);
+		return st == KCbStatusNone ? KErrTimedOut : KErrGeneral;
+		}
+	return KErrNone;
+	}
+
+// the device-wide object tables, once (vmw_otables_setup, with our own sizes); a PT64-mapped part of the kernel pool each
+TInt TVmwSvga::EnsureObjectTables()
+	{
+	if (iOtablesUp)
+		return iOtablesUp > 0 ? KErrNone : iOtablesUp;
+	TInt r = KErrNoMemory;
+	iKPool = TVmwPool::New(KKPoolBytes, EFalse);
+	if (iKPool)
+		r = iKPool->Commit(0, KOtEnd);
+	if (r != KErrNone)
+		return iOtablesUp = r;
+	static const struct { TInt iType, iOff, iBytes; } KTables[] = {
+		{ KOtableMob, KOtMobOff, KOtMobBytes }, { KOtableSurface, KOtSurfOff, KOtSurfBytes }, { KOtableContext, KOtCtxOff, KOtSmallBytes },
+		{ KOtableShader, KOtShaderOff, KOtSmallBytes }, { KOtableScreenTarget, KOtStOff, KOtSmallBytes }, { KOtableDxContext, KOtDxOff, KOtSmallBytes } };
+	for (TUint i = 0; i < sizeof(KTables) / sizeof(KTables[0]) && r == KErrNone; ++i)
+		{
+		TUint32 depth;
+		TUint64 base;
+		TInt* pt;
+		TInt ptc;
+		r = BuildTable(*iKPool, KTables[i].iOff, KTables[i].iBytes, depth, base, pt, ptc);   // (its page-table pages stay for good)
+		if (r != KErrNone)
+			break;
+		const TUint32 cmd[8] = { KCmdSetOtableBase64, 24, (TUint32)KTables[i].iType, (TUint32)base, (TUint32)(base >> 32), (TUint32)KTables[i].iBytes, 0, depth };
+		r = KernelCmd(cmd, 8, 0);
+		Kern::Free(pt);
+		}
+	Kern::Printf("[svga] S3: object tables (MOB %d KB, surface %d KB, ...) r=%d", KOtMobBytes >> 10, KOtSurfBytes >> 10, r);
+	iOtablesUp = (r == KErrNone ? 1 : r);
+	return r;
+	}
 
 class DVmwSvgaDevice : public DLogicalDevice
 	{
@@ -164,9 +506,16 @@ public:
 	virtual ~DVmwSvgaChannel();
 	virtual TInt DoCreate(TInt aUnit, const TDesC8* aInfo, const TVersion& aVer);
 	virtual TInt Request(TInt aReqNo, TAny* a1, TAny* a2);
+	TUint32 MobBase() const						{ return iSlot * KIdStride + 1; }
+	TUint32 SurfBase() const					{ return iSlot * KIdStride + 1; }
+	TUint32 CtxBase() const						{ return iSlot * KCtxStride + 1; }
 	DThread* iClient;
-	DChunk* iArena;
-	TUint32 iArenaPhys;
+	TVmwPool* iArena;
+	TVmwPool* iPool;
+	TInt iSlot;
+	TUint32 iSurfHigh, iCtxHigh;
+	struct TMob { TInt iPtCount; TInt* iPtPages; };
+	TMob* iMobs[KMobsPerSlot];
 	};
 
 TInt DVmwSvgaDevice::Create(DLogicalChannelBase*& aChannel)
@@ -179,30 +528,73 @@ TInt DVmwSvgaChannel::DoCreate(TInt, const TDesC8*, const TVersion& aVer)
 	{
 	iClient = NULL;
 	iArena = NULL;
+	iPool = NULL;
+	iSlot = -1;
 	if (!TheSvga || !TheSvga->iDma || !Kern::QueryVersionSupported(TVersion(KVmwSvgaMajorVersion, 0, 0), aVer))
 		return KErrNotSupported;
 	iClient = &Kern::CurrentThread();
 	iClient->Open();
-	TChunkCreateInfo info;
-	info.iType = TChunkCreateInfo::ESharedKernelMultiple;
-	info.iMaxSize = KDmaBytes;
-	info.iMapAttr = EMapAttrCachedMax;				// x86 DMA is cache-coherent
-	info.iOwnsMemory = EFalse;						// the RAM is the driver's contiguous block, not the chunk's
-	info.iDestroyedDfc = NULL;
-	TLinAddr lin;
-	TUint32 attr;
-	TInt r = Kern::ChunkCreate(info, iArena, lin, attr);
-	if (r != KErrNone)
-		return r;
-	r = Kern::ChunkCommitPhysical(iArena, 0, KDmaBytes, TheSvga->iDmaPhys);
-	iArenaPhys = TheSvga->iDmaPhys;
+	NKern::ThreadEnterCS();
+	Kern::MutexWait(*TheSvga->iLock);
+	for (TInt s = 0; s < KIdSlots && iSlot < 0; ++s)
+		if (!(TheSvga->iSlots & (1u << s)))
+			{
+			TheSvga->iSlots |= 1u << s;
+			iSlot = s;
+			}
+	Kern::MutexSignal(*TheSvga->iLock);
+	TInt r = iSlot < 0 ? KErrInUse : KErrNone;
+	if (r == KErrNone)
+		{
+		iArena = TVmwPool::New(KArenaBytes, ETrue);
+		if (!iArena)
+			iArena = TVmwPool::New(KArenaMin, ETrue);
+		if (!iArena)
+			r = KErrNoMemory;
+		}
+	NKern::ThreadLeaveCS();
 	return r;
 	}
 
 DVmwSvgaChannel::~DVmwSvgaChannel()
 	{
+	TVmwSvga* s = TheSvga;
+	NKern::ThreadEnterCS();
+	if (s && iSlot >= 0)
+		{
+		Kern::MutexWait(*s->iLock);
+		TInt nMob = 0;
+		// what this channel left on the device: contexts, then surfaces (ids the client reported), then the MOBs the kernel knows
+		for (TUint32 c = 0; c < iCtxHigh && c < (TUint32)KCtxPerSlot; ++c)
+			{
+			const TUint32 cmd[3] = { KCmdDxDestroyContext, 4, CtxBase() + c };
+			s->KernelCmd(cmd, 3, 0);
+			}
+		for (TUint32 i = 0; i < iSurfHigh && i < (TUint32)KSurfsPerSlot; ++i)
+			{
+			const TUint32 cmd[3] = { KCmdDestroyGbSurface, 4, SurfBase() + i };
+			s->KernelCmd(cmd, 3, 0);
+			}
+		for (TInt i = 0; i < KMobsPerSlot; ++i)
+			if (iMobs[i])
+				{
+				const TUint32 cmd[3] = { KCmdDestroyGbMob, 4, MobBase() + i };
+				s->KernelCmd(cmd, 3, 0);
+				for (TInt k = 0; k < iMobs[i]->iPtCount; ++k)
+					s->PtFree(iMobs[i]->iPtPages[k]);
+				Kern::Free(iMobs[i]->iPtPages);
+				delete iMobs[i];
+				++nMob;
+				}
+		s->iSlots &= ~(1u << iSlot);
+		Kern::MutexSignal(*s->iLock);
+		Kern::Printf("[svga] channel slot %d closed: %d contexts, %d surfaces, %d MOBs destroyed (device: %u command buffers, %u ticks slept)", iSlot, iCtxHigh, iSurfHigh, nMob, s->iCbs, s->iCbSleeps);
+		}
+	if (iPool)
+		iPool->Release();
 	if (iArena)
-		Kern::ChunkClose(iArena);
+		iArena->Release();
+	NKern::ThreadLeaveCS();
 	if (iClient)
 		Kern::SafeClose((DObject*&)iClient, NULL);
 	}
@@ -212,39 +604,169 @@ TInt DVmwSvgaChannel::Request(TInt aReqNo, TAny* a1, TAny*)
 	if (aReqNo < 0)
 		return KErrNone;
 	TVmwSvga& s = *TheSvga;
+	DThread* const t = &Kern::CurrentThread();
 	switch (aReqNo)
 		{
 	case EVmwCtrlGetInfo:
 		{
 		TVmwSvgaInfo info;
 		memclr(&info, sizeof(info));
+		NKern::ThreadEnterCS();
+		Kern::MutexWait(*s.iLock);
 		info.iVersion = s.iVer; info.iCaps = s.iCaps; info.iCap2 = s.iCap2;
-		info.iArenaPhys = iArenaPhys; info.iArenaSize = KDmaBytes;
+		info.iArenaPhys = iArena->iBlock; info.iArenaSize = iArena->iBytes;
 		info.iDevCaps[0] = s.DevCap(0); info.iDevCaps[1] = s.DevCap(95); info.iDevCaps[2] = s.DevCap(244);
 		info.iDevCaps[3] = s.DevCap(258); info.iDevCaps[4] = s.DevCap(261); info.iDevCaps[5] = s.DevCap(19);
+		info.iMobMaxKb = s.RegRead(KRegMobMaxSize) >> 10;
+		Kern::MutexSignal(*s.iLock);
+		NKern::ThreadLeaveCS();
+		info.iPoolBytes = KPoolBytes;
+		info.iMobBase = MobBase(); info.iMobCount = KMobsPerSlot;
+		info.iSurfBase = SurfBase(); info.iSurfCount = KSurfsPerSlot;
+		info.iCtxBase = CtxBase(); info.iCtxCount = KCtxPerSlot;
 		TPckgC<TVmwSvgaInfo> p(info);
-		return Kern::ThreadDesWrite(iClient, a1, p, 0, KChunkShiftBy0, NULL);
+		return Kern::ThreadDesWrite(t, a1, p, 0, KChunkShiftBy0, NULL);
+		}
+	case EVmwCtrlGetDevCaps:
+		{
+		NKern::ThreadEnterCS();
+		TVmwDevCaps* caps = (TVmwDevCaps*)Kern::Alloc(sizeof(TVmwDevCaps));
+		if (!caps)
+			{
+			NKern::ThreadLeaveCS();
+			return KErrNoMemory;
+			}
+		Kern::MutexWait(*s.iLock);
+		for (TInt i = 0; i < KVmwNumDevCaps; ++i)
+			caps->iCaps[i] = s.DevCap(i);
+		Kern::MutexSignal(*s.iLock);
+		NKern::ThreadLeaveCS();
+		TPtrC8 p((const TUint8*)caps, sizeof(TVmwDevCaps));
+		TInt r = Kern::ThreadDesWrite(t, a1, p, 0, KChunkShiftBy0, NULL);
+		NKern::ThreadEnterCS();
+		Kern::Free(caps);
+		NKern::ThreadLeaveCS();
+		return r;
 		}
 	case EVmwCtrlOpenArena:
 		{
 		NKern::ThreadEnterCS();
-		TInt h = Kern::MakeHandleAndOpen(NULL, iArena);
+		TInt h = Kern::MakeHandleAndOpen(NULL, iArena->iChunk);
 		NKern::ThreadLeaveCS();
 		return h;
+		}
+	case EVmwCtrlOpenPool:
+		{
+		NKern::ThreadEnterCS();
+		Kern::MutexWait(*s.iLock);
+		TInt r = s.EnsureObjectTables();
+		if (r == KErrNone && !iPool)
+			{
+			iPool = TVmwPool::New(KPoolBytes, EFalse);
+			if (!iPool)
+				r = KErrNoMemory;
+			}
+		Kern::MutexSignal(*s.iLock);
+		TInt h = r;
+		if (r == KErrNone)
+			h = Kern::MakeHandleAndOpen(NULL, iPool->iChunk);
+		NKern::ThreadLeaveCS();
+		return h;
+		}
+	case EVmwCtrlPoolCommit:
+		{
+		TVmwPoolRange rg;
+		TPckg<TVmwPoolRange> p(rg);
+		TInt r = Kern::ThreadDesRead(t, a1, p, 0, KChunkShiftBy0);
+		if (r != KErrNone)
+			return r;
+		if (!iPool)
+			return KErrNotReady;
+		NKern::ThreadEnterCS();
+		Kern::MutexWait(*s.iLock);
+		r = iPool->Commit(rg.iOffset, rg.iSize);
+		Kern::MutexSignal(*s.iLock);
+		NKern::ThreadLeaveCS();
+		return r;
+		}
+	case EVmwCtrlDefineMob:
+	case EVmwCtrlDestroyMob:
+		{
+		TVmwMob m;
+		TPckg<TVmwMob> p(m);
+		TInt r = Kern::ThreadDesRead(t, a1, p, 0, KChunkShiftBy0);
+		if (r != KErrNone)
+			return r;
+		if (!iPool || m.iMobId < MobBase() || m.iMobId >= MobBase() + KMobsPerSlot)
+			return KErrArgument;
+		const TInt idx = m.iMobId - MobBase();
+		NKern::ThreadEnterCS();
+		Kern::MutexWait(*s.iLock);
+		if (aReqNo == EVmwCtrlDefineMob)
+			{
+			if (iMobs[idx])
+				r = KErrAlreadyExists;
+			else if (m.iSize <= 0 || !iPool->Committed(m.iOffset, m.iSize))
+				r = KErrArgument;
+			else
+				{
+				TUint32 depth;
+				TUint64 base;
+				TInt* pt;
+				TInt ptc;
+				r = s.BuildTable(*iPool, m.iOffset, m.iSize, depth, base, pt, ptc);
+				if (r == KErrNone)
+					{
+					const TUint32 cmd[7] = { KCmdDefineGbMob64, 20, m.iMobId, depth, (TUint32)base, (TUint32)(base >> 32), (TUint32)m.iSize };
+					r = s.KernelCmd(cmd, 7, 0);
+					TMob* rec = r == KErrNone ? new TMob : NULL;
+					if (rec)
+						{
+						rec->iPtCount = ptc;
+						rec->iPtPages = pt;
+						iMobs[idx] = rec;
+						}
+					else
+						{
+						for (TInt k = 0; k < ptc; ++k)
+							s.PtFree(pt[k]);
+						Kern::Free(pt);
+						if (r == KErrNone)
+							r = KErrNoMemory;
+						}
+					}
+				}
+			}
+		else if (!iMobs[idx])
+			r = KErrNotFound;
+		else
+			{
+			const TUint32 cmd[3] = { KCmdDestroyGbMob, 4, m.iMobId };
+			r = s.KernelCmd(cmd, 3, 0);
+			TMob* rec = iMobs[idx];
+			iMobs[idx] = NULL;
+			for (TInt k = 0; k < rec->iPtCount; ++k)
+				s.PtFree(rec->iPtPages[k]);
+			Kern::Free(rec->iPtPages);
+			delete rec;
+			}
+		Kern::MutexSignal(*s.iLock);
+		NKern::ThreadLeaveCS();
+		return r;
 		}
 	case EVmwCtrlSubmit:
 		{
 		TVmwSubmit sub;
 		TPckg<TVmwSubmit> p(sub);
-		TInt r = Kern::ThreadDesRead(iClient, a1, p, 0, KChunkShiftBy0);
+		TInt r = Kern::ThreadDesRead(t, a1, p, 0, KChunkShiftBy0);
 		if (r != KErrNone)
 			return r;
-		if (sub.iLength <= 0 || sub.iOffset < 0 || sub.iOffset + sub.iLength > KDmaBytes || (sub.iOffset & 3))
+		if (sub.iLength <= 0 || sub.iOffset < 0 || sub.iOffset + sub.iLength > iArena->iBytes || (sub.iOffset & 3))
 			return KErrArgument;
-		r = s.SubmitFromArena(sub);
+		r = s.SubmitChannel(*this, sub);
 		if (r != KErrNone)
 			return r;
-		return Kern::ThreadDesWrite(iClient, a1, p, 0, KChunkShiftBy0, NULL);
+		return Kern::ThreadDesWrite(t, a1, p, 0, KChunkShiftBy0, NULL);
 		}
 	default:
 		return KErrNotSupported;
@@ -429,28 +951,37 @@ void TVmwSvga::BuildDxClear()
 	}
 	}
 
-// one command buffer out of the client's arena: the header is ours (slot 8), the command PA = arena phys + offset; synchronous
-TInt TVmwSvga::SubmitFromArena(TVmwSubmit& aSub)
+// one command buffer out of the channel's arena: the header is ours (a slot per channel), the command PA = arena phys + offset; synchronous
+TInt TVmwSvga::SubmitChannel(DVmwSvgaChannel& aCh, TVmwSubmit& aSub)
 	{
-	const TInt slot = 8;
+	const TInt slot = KHdrSlotChannel + aCh.iSlot;
 	NKern::ThreadEnterCS();
 	Kern::MutexWait(*iLock);
+	if (aSub.iSurfHigh > aCh.iSurfHigh)
+		aCh.iSurfHigh = aSub.iSurfHigh;
+	if (aSub.iCtxHigh > aCh.iCtxHigh)
+		aCh.iCtxHigh = aSub.iCtxHigh;
 	SCbHeader* h = Hdr(slot);
 	memclr(h, sizeof(*h));
 	h->iFlags = aSub.iFlags & 3;					// NO_IRQ / DX_CONTEXT only
 	h->iDxContext = aSub.iDxContext;
 	h->iLength = aSub.iLength;
-	h->iPaLo = iDmaPhys + aSub.iOffset;
+	h->iPaLo = aCh.iArena->iBlock + aSub.iOffset;
 	h->iPaHi = 0;
 	h->iStatus = KCbStatusNone;
 	Write(KRegCommandHigh, 0);
 	Write(KRegCommandLow, HdrPhys(slot) | (aSub.iContext & 0x3f));
 	TInt waited = 0;
+	// the host usually answers within microseconds: poll first (a sleep costs a whole timer tick), then give the CPU away
+	for (TInt spin = 0; spin < 4000 && h->iStatus == KCbStatusNone; ++spin)
+		Kern::NanoWait(1000);
 	while (h->iStatus == KCbStatusNone && waited < 2000)
 		{
 		NKern::Sleep(NKern::TimerTicks(1));
 		++waited;
 		}
+	++iCbs;
+	iCbSleeps += waited;
 	aSub.iStatus = h->iStatus;
 	aSub.iErrorOffset = h->iErrorOffset;
 	Kern::MutexSignal(*iLock);
