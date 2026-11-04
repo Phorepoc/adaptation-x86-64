@@ -42,8 +42,8 @@ TInt X64ExtensionEntry(TInt aReason);							// high half (static no-op extension
 void X64MinisecEntry();										// ROM, runs in ring 3 (xk_minisec.cpp)
 TAny* X64CreateLdd_enet();										// high half (xk_e1000.cpp): built-in device factories
 TAny* X64CreatePdd_e1000();
-TAny* X64CreateLdd_soundsc();									// xk_ac97.cpp (X4.88)
-TAny* X64CreatePdd_ac97();
+TAny* X64CreateLdd_soundsc();									// xk_sound.cpp (X4.88)
+TAny* X64CreatePdd_sound();
 TAny* X64CreateLdd_camerasc();									// xk_camerasc.cpp (camera C1)
 TAny* X64CreatePdd_camerasc();
 extern char __utext_base[], __utext_end[], __uimage_base[];
@@ -543,7 +543,7 @@ extern "C" void kmain(TUint32 aMultibootInfo)
 					case 1: f = SYMVAL(X64CreateLdd_enet); break;		// Sys\Bin\enet.ldd
 					case 2: f = SYMVAL(X64CreatePdd_e1000); break;		// Sys\Bin\ethernet.pdd
 					case 3: f = SYMVAL(X64CreateLdd_soundsc); break;	// Sys\Bin\esoundsc.ldd (X4.88)
-					case 4: f = SYMVAL(X64CreatePdd_ac97); break;		// Sys\Bin\soundsc.pdd
+					case 4: f = SYMVAL(X64CreatePdd_sound); break;		// Sys\Bin\soundsc.pdd
 					case 5: f = SYMVAL(X64CreateLdd_camerasc); break;	// Sys\Bin\ecamerasc.ldd (camera C1)
 					case 6: f = SYMVAL(X64CreatePdd_camerasc); break;	// Sys\Bin\camerasc.pdd
 					default: Die("ROM section: unknown built-in device id");

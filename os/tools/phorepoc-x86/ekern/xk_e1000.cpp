@@ -25,15 +25,7 @@
 #include <assp.h>
 #include <ethernet.h>
 #include "xk_interrupt.h"
-
-static inline TUint32 Inl(TUint16 aPort)
-	{ TUint32 v; __asm__ __volatile__("in eax, dx" : "=a"(v) : "d"(aPort)); return v; }
-static inline void Outl(TUint16 aPort, TUint32 aVal)
-	{ __asm__ __volatile__("out dx, eax" : : "d"(aPort), "a"(aVal) : "memory"); }
-static TUint32 PciRead(TInt aDev, TInt aReg)
-	{ Outl(0xCF8, 0x80000000u | aDev << 11 | (aReg & 0xFC)); return Inl(0xCFC); }
-static void PciWrite(TInt aDev, TInt aReg, TUint32 aVal)
-	{ Outl(0xCF8, 0x80000000u | aDev << 11 | (aReg & 0xFC)); Outl(0xCFC, aVal); }
+#include "xk_pci.h"
 
 // ---- the chip (Intel 8254x SDM, section 13) -----------------------------------------------------------
 enum
@@ -100,15 +92,15 @@ TInt TE1000::Init()
 	TInt dev = -1;
 	for (TInt d=0; d<32 && dev<0; ++d)
 		{
-		const TUint32 id = PciRead(d, 0);
+		const TUint32 id = XkPciRead(0, d, 0, 0);
 		const TUint32 did = id >> 16;						// 82540EM (QEMU, VBox MT Desktop), 82545EM, 82543GC
 		if ((id & 0xFFFF) == 0x8086 && (did == 0x100E || did == 0x100F || did == 0x1004))
 			dev = d;
 		}
 	if (dev < 0)
 		return KErrNotFound;
-	const TUint32 bar0 = PciRead(dev, 0x10) & ~0xFu;
-	PciWrite(dev, 0x04, PciRead(dev, 0x04) | 0x6);			// memory decode + bus master
+	const TUint32 bar0 = XkPciRead(0, dev, 0, 0x10) & ~0xFu;
+	XkPciWrite(0, dev, 0, 0x04, XkPciRead(0, dev, 0, 0x04) | 0x6);			// memory decode + bus master
 	DPlatChunkHw* mmio;
 	TInt r = DPlatChunkHw::New(mmio, bar0, 0x20000, EMapAttrSupRw | EMapAttrFullyBlocking);
 	if (r != KErrNone)
@@ -152,7 +144,7 @@ TInt TE1000::Init()
 	SetReg(ERctl, KRctlEn | KRctlBam | KRctlSecrc);
 
 	iRxDfc.SetDfcQ(Kern::DfcQue0());
-	const TInt line = PciRead(dev, 0x3C) & 0xFF;
+	const TInt line = XkPciRead(0, dev, 0, 0x3C) & 0xFF;
 	iIrqId = (line > 0 && line < 16) ? (EX64IrqPciRouted | line) : -1;
 	TInt h = iIrqId >= 0 ? Interrupt::Bind(iIrqId, Isr, this) : KErrNotSupported;
 	if (h >= 0)
@@ -163,7 +155,7 @@ TInt TE1000::Init()
 	iLinkUp = (Reg(EStatus) & KStatusLu) != 0;
 	iPoll.OneShot(NKern::TimerTicks(100));					// safety net (and the only path without an IRQ)
 	Kern::Printf("[e1000] %08x at 00:%02x.0, MMIO %08x, MAC %02x:%02x:%02x:%02x:%02x:%02x, link %s, "
-					"irq: PIRQ-routed %d (bind %d)", PciRead(dev, 0), dev, bar0, iMac[0], iMac[1], iMac[2],
+					"irq: PIRQ-routed %d (bind %d)", XkPciRead(0, dev, 0, 0), dev, bar0, iMac[0], iMac[1], iMac[2],
 					iMac[3], iMac[4], iMac[5], iLinkUp ? "up" : "down", line, h);
 	return KErrNone;
 	}

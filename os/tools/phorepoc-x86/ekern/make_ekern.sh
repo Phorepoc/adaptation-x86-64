@@ -91,7 +91,7 @@ PRE="-include toolchain/x32/port_prelude.h -include e32def.h"
 # a run that changes none of them (every app-debug iteration: only the ROM changes) reuses them. The ROM image
 # object (xk_uimage.o) is rebuilt when romsect.bin is newer; link + ISO are skipped when nothing changed at all.
 OSTAMP=$OUT/image-objs.stamp
-OKEY="$DEFS|$FBDEF|$KKEY|snd${SOUND_TEST:-}"
+OKEY="$DEFS|$FBDEF|$KKEY|snd${SOUND_TEST:-}|hda${HDADUMP:-}${HDAIMM:-}"
 OBJS_OK=0
 if [ "${KCLEAN:-0}" != 1 ] && [ -f "$OSTAMP" ] && [ "$(cat "$OSTAMP")" = "$OKEY" ]    && [ -z "$(find -L "$PORT" "$EK" "$SRC/boot.S" "$SRC/grub.cfg" "$KINC" -newer "$OSTAMP" -type f 2>/dev/null | head -1)" ]; then
   echo "[3/5] boot stub + port objects: unchanged -- reused"; OBJS_OK=1
@@ -165,7 +165,12 @@ $CXX $DEFS $INCS $MED $PRE -DCreateLogicalDevice=CreateLogicalDevice_enet -c "$E
 $CXX $DEFS $INCS $MED $PRE -c "$EK/xk_e1000.cpp" -o "$OUT/xk_e1000.o"
 # X4.88: AC'97 audio (PDD) + the REAL shared-chunk sound LDD (unmodified; entry renamed). SOUND_TEST=1: a boot sine
 $CXX $DEFS $INCS $MED $PRE -DCreateLogicalDevice=CreateLogicalDevice_soundsc -DKernelModuleEntry=KernelModuleEntry_soundsc -c "$EKA/drivers/soundsc/soundldd.cpp" -o "$OUT/soundldd.o"
-$CXX $DEFS $INCS $MED $PRE ${SOUND_TEST:+-DSOUND_TEST} -c "$EK/xk_ac97.cpp" -o "$OUT/xk_ac97.o"
+$CXX $DEFS $INCS $MED $PRE -c "$EK/xk_ac97.cpp" -o "$OUT/xk_ac97.o"
+# Intel HD Audio (PDD, the same LDD) and the probe that picks AC'97 or HD Audio at boot. SOUND_TEST=1: a boot sine through
+# whichever was found; HDADUMP=1: log the full HD Audio widget graph of every codec (verifying a new host); HDAIMM=1: test the
+# immediate-command path (ICOI/ICII/ICIS) instead of CORB/RIRB
+$CXX $DEFS $INCS $MED $PRE ${HDADUMP:+-DXK_HDA_DUMP=1} ${HDAIMM:+-DXK_HDA_IMM} -c "$EK/xk_hda.cpp" -o "$OUT/xk_hda.o"
+$CXX $DEFS $INCS $MED $PRE ${SOUND_TEST:+-DSOUND_TEST} -c "$EK/xk_sound.cpp" -o "$OUT/xk_sound.o"
 # camera (camera-plan.md C1): the 2010 shared-chunk camera LDD (DCameraScLdd, restored from kernelhwsrv BRANCH_RCL_3 into third_party/symbian2010-camerasc, unmodified, entry renamed)
 # + the 2010 template PDD (a timer-driven fake sensor that alternates a YUV logo; unmodified) + our two built-in-device wrappers (xk_camerasc.cpp)
 CAMD=third_party/symbian2010-camerasc
@@ -197,7 +202,7 @@ echo "[4/5] link at EKA2's native addresses"
 NK=$KOUT/nkernsmp
 ld -m elf32_x86_64 -n -z max-page-size=0x1000 -T "$EK/ekern.lds" -Map "$OUT/ekern.map" -o "$OUT/ekern.elf32" \
    "$OUT/boot.o" "$OUT/xboot.o" "$OUT/xk_entry.o" "$OUT/xk_irq.o" "$OUT/xk_smp.o" "$OUT/ncirq.o" "$OUT/xk_interrupt.o" "$OUT/xk_aptramp.o" "$OUT/xk_minisec.o" "$OUT/xk_uimage.o" "$OUT/exstart.o" "$OUT/xk_vectors.o" \
-   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_vmwsvga.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
+   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
    $NK/nklib.o $NK/nkern.o $NK/nkerns.o $NK/sched.o $NK/dfcs.o $NK/nk_timer.o $NK/nk_irq.o $NK/nk_bal.o \
    $NK/x64s_atomics.o $NK/x64s_ncutils.o $NK/x64s_ncsched.o $NK/x64_ctxsw.o 2>"$OUT/ld.log" \
   || { grep -v "RWX\|GNU-stack\|deprecated" "$OUT/ld.log" | c++filt | head -30; exit 1; }
@@ -252,9 +257,17 @@ if [ "${1:-}" = "run" ]; then
   # (tcpdump -nr it in the container: DNS, TCP, what an app actually sent)
   [ "${PCAP:-0}" = 1 ] && NIC="-netdev user,id=n0${NETOPTS:+,$NETOPTS} -device e1000,netdev=n0 -object filter-dump,id=f0,netdev=n0,file=$OUT/net.pcap"
   # X4.88: AC'97 audio (xk_ac97.cpp). SOUND_WAV=1 captures the output to $OUT/sound.wav (headless: the host checks
-  # it); otherwise a silent backend -- the device is still there, drivers and DevSound run
-  AUDIO="-audiodev none,id=snd0 -device AC97,audiodev=snd0"
-  [ "${SOUND_WAV:-0}" = 1 ] && AUDIO="-audiodev wav,id=snd0,path=$OUT/sound.wav -device AC97,audiodev=snd0"
+  # it); otherwise a silent backend -- the device is still there, drivers and DevSound run.
+  # AUDIO=hda | ich9: Intel HD Audio instead (xk_hda.cpp): the ICH6 controller (intel-hda) or the ICH9 one, with a duplex
+  # codec (output + input); AUDIO=hda-out: an output-only codec
+  ADEV="AC97,audiodev=snd0"
+  case "${AUDIO:-ac97}" in
+    hda)     ADEV="intel-hda -device hda-duplex,audiodev=snd0" ;;
+    hda-out) ADEV="intel-hda -device hda-output,audiodev=snd0" ;;
+    ich9)    ADEV="ich9-intel-hda -device hda-duplex,audiodev=snd0" ;;
+  esac
+  AUDIO="-audiodev none,id=snd0 -device $ADEV"
+  [ "${SOUND_WAV:-0}" = 1 ] && AUDIO="-audiodev wav,id=snd0,path=$OUT/sound.wav,out.frequency=48000 -device $ADEV"
   # QUIT_ON="<serial text>" (2026-10-13): QEMU stops a few seconds after the log shows it (e.g. '[js] exit(' when the test
   # exe ends) -- the run lasts as long as the test, not SECS (phwebtest: ~5 min of a 7m42s boot was idle). Only the log's
   # tail is read, once a second.

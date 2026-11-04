@@ -30,6 +30,7 @@
 #include <assp.h>
 #include "xk_interrupt.h"
 #include "xk_absmouse.h"
+#include "xk_pci.h"
 
 static inline TUint32 Inl(TUint16 aPort)
 	{ TUint32 v; __asm__ __volatile__("in eax, dx" : "=a"(v) : "d"(aPort)); return v; }
@@ -37,18 +38,6 @@ static inline void Outl(TUint16 aPort, TUint32 aVal)
 	{ __asm__ __volatile__("out dx, eax" : : "d"(aPort), "a"(aVal) : "memory"); }
 static inline void Outw(TUint16 aPort, TUint16 aVal)
 	{ __asm__ __volatile__("out dx, ax" : : "d"(aPort), "a"(aVal)); }
-
-// ---- PCI configuration mechanism #1 -------------------------------------------------------------------
-static TUint32 PciRead(TInt aBus, TInt aDev, TInt aFn, TInt aReg)
-	{
-	Outl(0xCF8, 0x80000000u | aBus << 16 | aDev << 11 | aFn << 8 | (aReg & 0xFC));
-	return Inl(0xCFC);
-	}
-static void PciWrite16(TInt aBus, TInt aDev, TInt aFn, TInt aReg, TUint16 aVal)
-	{
-	Outl(0xCF8, 0x80000000u | aBus << 16 | aDev << 11 | aFn << 8 | (aReg & 0xFC));
-	Outw(0xCFC + (aReg & 2), aVal);
-	}
 
 // ---- VirtualBox VMMDev (VBox/VMMDev.h; the values are the host's ABI) --------------------------------
 static const TUint32 KVmmDevId = 0xCAFE80EEu;			// device << 16 | vendor
@@ -131,16 +120,16 @@ static TBool VmmDevInit()
 	{
 	TInt bus = -1, dev = 0;
 	for (TInt d=0; d<32 && bus<0; ++d)					// bus 0 is where VirtualBox puts it (00:04.0)
-		if (PciRead(0, d, 0, 0) == KVmmDevId)
+		if (XkPciRead(0, d, 0, 0) == KVmmDevId)
 			bus = 0, dev = d;
 	if (bus < 0)
 		return EFalse;
-	const TUint32 bar0 = PciRead(bus, dev, 0, 0x10);
+	const TUint32 bar0 = XkPciRead(bus, dev, 0, 0x10);
 	if (!(bar0 & 1))
 		return EFalse;
 	TheVmmPort = (TUint16)(bar0 & 0xFFFC);
 	TheVmmDevSlot = dev;
-	PciWrite16(bus, dev, 0, 0x04, (TUint16)(PciRead(bus, dev, 0, 0x04) | 0x3));	// I/O + memory decode on
+	XkPciWrite16(bus, dev, 0, 0x04, (TUint16)(XkPciRead(bus, dev, 0, 0x04) | 0x3));	// I/O + memory decode on
 	TPhysAddr phys;
 	TInt r = Epoc::AllocPhysicalRam(0x1000, phys);
 	if (r == KErrNone)
@@ -274,7 +263,7 @@ TInt X64AbsMouseBindIrq(TDfc* aDfc)
 	TUint32 caps = KGuestSupportsGraphics;
 	TInt rcCaps = VmmRequest(EReqReportGuestCapabilities, &caps, sizeof(caps), NULL);
 	TheIrqDfc = aDfc;
-	const TInt line = PciRead(0, TheVmmDevSlot, 0, 0x3C) & 0xFF;
+	const TInt line = XkPciRead(0, TheVmmDevSlot, 0, 0x3C) & 0xFF;
 	if (line > 0 && line < 16)
 		TheCand[TheNumCand++] = EX64IrqPciRouted | line;
 	for (TInt g=16; g<16+8; ++g)

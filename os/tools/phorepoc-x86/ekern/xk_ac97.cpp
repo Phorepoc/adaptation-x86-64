@@ -22,6 +22,8 @@
 #include <drivers/soundsc.h>
 #include <assp.h>
 #include "xk_interrupt.h"
+#include "xk_pci.h"
+#include "xk_sound.h"
 
 static inline TUint8 Inb(TUint16 p)			{ TUint8 v; asm volatile("in al, dx" : "=a"(v) : "d"(p)); return v; }
 static inline TUint16 Inw(TUint16 p)		{ TUint16 v; asm volatile("in ax, dx" : "=a"(v) : "d"(p)); return v; }
@@ -29,8 +31,6 @@ static inline TUint32 Inl(TUint16 p)		{ TUint32 v; asm volatile("in eax, dx" : "
 static inline void Outb(TUint16 p, TUint8 v)	{ asm volatile("out dx, al" : : "a"(v), "d"(p)); }
 static inline void Outw(TUint16 p, TUint16 v)	{ asm volatile("out dx, ax" : : "a"(v), "d"(p)); }
 static inline void Outl(TUint16 p, TUint32 v)	{ asm volatile("out dx, eax" : : "a"(v), "d"(p)); }
-static TUint32 PciRead(TInt aDev, TInt aReg)	{ Outl(0xCF8, 0x80000000u | (aDev << 11) | (aReg & 0xFC)); return Inl(0xCFC); }
-static void PciWrite(TInt aDev, TInt aReg, TUint32 aVal)	{ Outl(0xCF8, 0x80000000u | (aDev << 11) | (aReg & 0xFC)); Outl(0xCFC, aVal); }
 
 // NAM (mixer) registers
 static const TUint16 KNamReset = 0x00, KNamMaster = 0x02, KNamPcmOut = 0x18, KNamExtId = 0x28, KNamExtCtrl = 0x2A,
@@ -57,7 +57,7 @@ public:
 	void Reset();
 	TInt SetRate(TInt aHz);
 	void SetVolume(TInt aVol);								// 0..255 (the LDD's scale)
-	TInt Queue(TPhysAddr aPhys, TInt aBytes, TUint aId);	// -> KErrOverflow when the list is full
+	TInt Queue(TPhysAddr aPhys, TInt aBytes, TUint aId);	// -> KErrNotReady when the list is full
 	void Start();
 	void Stop();
 	void Pause(TBool aPause);
@@ -68,6 +68,7 @@ public:
 public:
 	TUint16 iNam, iNabm;
 	TInt iDev;
+	SPciLoc iLoc;
 	TInt iIrqId;
 	TPhysAddr iBdlPhys;
 	volatile SBd* iBdl;
@@ -98,15 +99,12 @@ void TAc97::Reset()
 
 TInt TAc97::Init()
 	{
-	iDev = -1;
-	for (TInt d = 0; d < 32 && iDev < 0; ++d)
-		if (PciRead(d, 0) == 0x24158086)
-			iDev = d;
-	if (iDev < 0)
+	if (!XkPciFind(0x24158086, -1, iLoc))
 		return KErrNotFound;
-	iNam = (TUint16)(PciRead(iDev, 0x10) & ~3u);
-	iNabm = (TUint16)(PciRead(iDev, 0x14) & ~3u);
-	PciWrite(iDev, 0x04, PciRead(iDev, 0x04) | 0x5);		// I/O decode + bus master
+	iDev = iLoc.iDev;
+	iNam = (TUint16)(XkPciRead(iLoc.iBus, iLoc.iDev, iLoc.iFn, 0x10) & ~3u);
+	iNabm = (TUint16)(XkPciRead(iLoc.iBus, iLoc.iDev, iLoc.iFn, 0x14) & ~3u);
+	XkPciWrite(iLoc.iBus, iLoc.iDev, iLoc.iFn, 0x04, XkPciRead(iLoc.iBus, iLoc.iDev, iLoc.iFn, 0x04) | 0x5);		// I/O decode + bus master
 	// cold reset off (GLOB_CNT bit 1), then the codec's "primary ready" (GLOB_STA bit 8)
 	Outl(iNabm + KGlobCnt, 0x2);
 	TInt i;
@@ -133,13 +131,13 @@ TInt TAc97::Init()
 	if (r != KErrNone)
 		return r;
 	iDoneDfc.SetDfcQ(iDfcQ);
-	const TInt line = PciRead(iDev, 0x3C) & 0xFF;
+	const TInt line = XkPciRead(iLoc.iBus, iLoc.iDev, iLoc.iFn, 0x3C) & 0xFF;
 	iIrqId = (line > 0 && line < 16) ? (EX64IrqPciRouted | line) : -1;
 	TInt h = iIrqId >= 0 ? Interrupt::Bind(iIrqId, Isr, this) : KErrNotSupported;
 	if (h >= 0)
 		Interrupt::Enable(h);
 	Kern::Printf("[ac97] %08x at 00:%02x.0, NAM %04x NABM %04x, codec %s, VRA %d, irq %d (bind %d)",
-				 PciRead(iDev, 0), iDev, iNam, iNabm, (Inl(iNabm + KGlobSta) & 0x100) ? "ready" : "NOT ready",
+				 XkPciRead(iLoc.iBus, iLoc.iDev, iLoc.iFn, 0), iDev, iNam, iNabm, (Inl(iNabm + KGlobSta) & 0x100) ? "ready" : "NOT ready",
 				 Inw(iNam + KNamExtId) & 1, line, h);
 	return KErrNone;
 	}
@@ -163,7 +161,7 @@ void TAc97::SetVolume(TInt aVol)
 TInt TAc97::Queue(TPhysAddr aPhys, TInt aBytes, TUint aId)
 	{
 	if (iCount >= KBdN - 1)
-		return KErrOverflow;
+		return KErrNotReady;								// the LDD retries after the next PlayCallback; any other error fails the request
 	const TInt idx = (iHead + iCount) & (KBdN - 1);
 	iBdl[idx].iAddr = aPhys;
 	iBdl[idx].iSamples = (TUint16)(aBytes / 2);
@@ -332,7 +330,7 @@ public:
 		}
 	};
 
-// SOUND_TEST=1: 1 s of a 440 Hz sine at 48 kHz (a quarter-wave table, no FPU), queued in 32 KB pieces, played
+// SOUND_TEST=1: 1 s of a 440 Hz sine at 48 kHz (X64FillSine440), queued in 32 KB pieces, played
 // straight through the engine; the completion DFC logs how many entries finished
 void TAc97::SelfTest()
 	{
@@ -343,17 +341,7 @@ void TAc97::SelfTest()
 	DPlatChunkHw* ch = NULL;
 	if (DPlatChunkHw::New(ch, phys, Kern::RoundToPageSize(KBytes), EMapAttrSupRw | EMapAttrFullyBlocking) != KErrNone)
 		return;
-	TInt16* s = (TInt16*)ch->LinearAddress();
-	// sin(2*pi*k/n) for a 440 Hz period at 48 kHz (~109 samples): a parabolic approximation, amplitude 8000
-	for (TInt i = 0; i < KBytes / 4; ++i)
-		{
-		const TInt ph = (i * 440 * 4096 / 48000) & 4095;	// phase in 1/4096 of a period
-		const TInt x = (ph & 2047) - 1024;					// -1024..1023 over a half period
-		TInt v = 8000 - (8000 * x / 1024) * x / 1024;		// 0..8000..0 (a parabola)
-		if (ph >= 2048)
-			v = -v;
-		s[2 * i] = s[2 * i + 1] = (TInt16)v;
-		}
+	X64FillSine440((TInt16*)ch->LinearAddress(), KBytes / 4);
 	SetRate(48000);
 	for (TInt off = 0, id = 0; off < KBytes; off += 32768, ++id)
 		Queue(phys + off, Min(32768, KBytes - off), id);
@@ -361,34 +349,27 @@ void TAc97::SelfTest()
 	Start();
 	}
 
-DLogicalDevice* CreateLogicalDevice_soundsc();				// soundldd.cpp (DECLARE_STANDARD_LDD, renamed)
-
-void X64StartSound()
+TInt X64Ac97Start()
 	{
 	NKern::ThreadEnterCS();
 	TheAc97 = new TAc97;
 	TInt r = TheAc97 ? TheAc97->Init() : KErrNoMemory;
 	if (r != KErrNone)
 		{
-		Kern::Printf("[ac97] no AC'97 audio (%d): no sound", r);
 		delete TheAc97;
 		TheAc97 = NULL;
 		}
-#ifdef SOUND_TEST
-	else
-		TheAc97->SelfTest();
-#endif
 	NKern::ThreadLeaveCS();
+	return r;
 	}
 
-// Sys\Bin\esoundsc.ldd / soundsc.pdd (rombuild --builtin-device; xboot.cpp points export 1 here) -- the names
-// mdasoundadapter loads
-extern "C" DLogicalDevice* X64CreateLdd_soundsc()
+void X64Ac97SelfTest()
 	{
-	return CreateLogicalDevice_soundsc();
+	if (TheAc97)
+		TheAc97->SelfTest();
 	}
 
-extern "C" DPhysicalDevice* X64CreatePdd_ac97()
+DPhysicalDevice* X64Ac97NewFactory()
 	{
 	return TheAc97 ? new DAc97Factory : NULL;
 	}
