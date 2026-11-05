@@ -371,8 +371,48 @@ static void CursorRect(volatile TUint32* aFb, TInt aWpl, TInt aX, TInt aY, TBool
 		}
 	}
 
+// FRAME LOG (as the A64 display driver's): each flush that changed something is a frame -- its white and black share on
+// a sample grid (every 8th row, every 16th pixel of the shadow) and a checksum; a line for a frame that is mostly white
+// right after one that was not, the counters with the flush statistics. phone_gate.py / the QEMU checks read the lines.
+static TUint32 TheFrames, TheWhiteFlashes, TheLastWhiteLineMs;
+static TUint TheFramePrevWhite = 255;
+
+static void FrameRecord()
+	{
+	const TInt w = X64ActiveW, h = X64ActiveH, wpl = ScreenWpl();
+	TUint n = 0, white = 0, black = 0, sum = 0;
+	for (TInt y = 4; y < h; y += 8)
+		for (TInt x = 8; x < w; x += 16)
+			{
+			const TUint32 p = TheScreen[y*wpl + x];
+			++n;
+			if ((p & 0xF0F0F0) == 0xF0F0F0)
+				++white;
+			else if ((p & 0xE0E0E0) == 0)
+				++black;
+			sum = (sum << 5 | sum >> 27) ^ p;
+			}
+	if (!n)
+		return;
+	++TheFrames;
+	const TUint wp = white * 100 / n;
+	if (wp >= 85 && TheFramePrevWhite < 40)
+		{
+		++TheWhiteFlashes;
+		const TUint32 ms = (TUint32)(((TUint64)NKern::TickCount() * NKern::TickPeriod()) / 1000);
+		if (ms - TheLastWhiteLineMs >= 100)							// (bounded: at most 10 lines a second)
+			{
+			TheLastWhiteLineMs = ms;
+			Kern::Printf("[EKERN][frame] WHITE frame after a non-white one #%u t=%u ms white=%u%% black=%u%% sum=%08x",
+						 TheFrames, ms, wp, black * 100 / n, sum);
+			}
+		}
+	TheFramePrevWhite = wp;
+	}
+
 static void FlushDfcFn(TAny*)
 	{
+	const TUint32 rowsBefore = TheFlushedRows;
 	volatile TUint32* fb = (volatile TUint32*)TheFbChunk->LinearAddress();
 	const TInt wpl = TheFb.iPitch / 4;							// framebuffer words per line
 	const TInt w = X64ScreenW, s = X64Scale;						// w = the shadow's line length
@@ -422,7 +462,15 @@ static void FlushDfcFn(TAny*)
 		CursorRect(fb, wpl, nx, ny, ETrue);
 	TheDrawnX = nx;  TheDrawnY = ny;
 	SendDirty();													// SVGA: tell the host what this pass wrote (the cursor included)
+	if (TheFlushedRows != rowsBefore)
+		FrameRecord();
 	++TheFlushes;
+	static TUint32 printedFrames;
+	if (TheFlushes % 250 == 0 && TheFrames != printedFrames)		// every 5 s, only while the screen changes
+		{
+		printedFrames = TheFrames;
+		Kern::Printf("[EKERN][mon] disp frames=%u white-flashes=%u", TheFrames, TheWhiteFlashes);
+		}
 	TheFlushTimer.OneShot(NKern::TimerTicks(KFlushMs));
 	}
 
