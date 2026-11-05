@@ -182,6 +182,20 @@ $CXX $DEFS $CAMI $INCS $MED -I $CAMP $PRE -c "$CAMP/camerasc_sensor.cpp" -o "$OU
 $CXX $DEFS $CAMI $INCS $MED $PRE -c "$EK/xk_camerasc.cpp" -o "$OUT/xk_camerasc.o"
 # S0 (vm-gpu-options.md): the read-only SVGA II / SVGA3D capability probe
 $CXX $DEFS $INCS $PRE -c "$EK/xk_vmwsvga.cpp" -o "$OUT/xk_vmwsvga.o"
+# Graphics Resource (RSgImage): the REAL 2010 sg extension + sgdevice LDD (graphicsresourceimplementation/src, unmodified, entry
+# points renamed) + our built-in-device wrapper (xk_sgresource.cpp). Their <sgresource/...> includes are the package's exported
+# headers (bld.inf: OS_LAYER_PLATFORM_EXPORT_PATH(sgresource/...)), linked into $OUT/sginc under that name.
+KSG="${KSG:-baseline/symbian-2010/oss.FCL.sf.os.graphics/graphicsresourceservices}"
+rm -rf "$OUT/sginc"; mkdir -p "$OUT/sginc/sgresource"
+for h in "$KSG"/graphicsresourceimplementation/inc/* "$KSG"/graphicsresourceinterface/inc/*; do ln -sf "$(cd "$(dirname "$h")" && pwd)/$(basename "$h")" "$OUT/sginc/sgresource/"; done
+SGI="-I $KSG/graphicsresourceimplementation/inc -I $OUT/sginc"
+$CXX $DEFS $INCS $SGI $PRE -DInitExtension=InitExtension_sgext -DKernelModuleEntry=KernelModuleEntry_sgext \
+     -c "$KSG/graphicsresourceimplementation/src/sgextension.cpp" -o "$OUT/sgextension.o"
+$CXX $DEFS $INCS $SGI $PRE -c "$KSG/graphicsresourceimplementation/src/sgresource.cpp" -o "$OUT/sgresource_k.o"
+$CXX $DEFS $INCS $SGI $PRE -DCreateLogicalDevice=CreateLogicalDevice_sgdev -DKernelModuleEntry=KernelModuleEntry_sgdev \
+     -c "$KSG/graphicsresourceimplementation/src/sgdevice.cpp" -o "$OUT/sgdevice.o"
+$CXX $DEFS $INCS $SGI $PRE -c "$KSG/graphicsresourceimplementation/src/sgchannel.cpp" -o "$OUT/sgchannel.o"
+$CXX $DEFS $INCS $PRE -c "$EK/xk_sgresource.cpp" -o "$OUT/xk_sgresource.o"
 # X4.27 debug aid: DUMP=<s> dumps every thread (state + symbolizable user stack) once, s seconds in
 $CXX $DEFS $INCS $PRE -fno-access-control -c "$EK/xk_threaddump.cpp" -o "$OUT/xk_threaddump.o"
 # the first user program: no kernel headers, no kernel symbols
@@ -202,7 +216,7 @@ echo "[4/5] link at EKA2's native addresses"
 NK=$KOUT/nkernsmp
 ld -m elf32_x86_64 -n -z max-page-size=0x1000 -T "$EK/ekern.lds" -Map "$OUT/ekern.map" -o "$OUT/ekern.elf32" \
    "$OUT/boot.o" "$OUT/xboot.o" "$OUT/xk_entry.o" "$OUT/xk_irq.o" "$OUT/xk_smp.o" "$OUT/ncirq.o" "$OUT/xk_interrupt.o" "$OUT/xk_aptramp.o" "$OUT/xk_minisec.o" "$OUT/xk_uimage.o" "$OUT/exstart.o" "$OUT/xk_vectors.o" \
-   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
+   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/sgextension.o" "$OUT/sgresource_k.o" "$OUT/sgdevice.o" "$OUT/sgchannel.o" "$OUT/xk_sgresource.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
    $NK/nklib.o $NK/nkern.o $NK/nkerns.o $NK/sched.o $NK/dfcs.o $NK/nk_timer.o $NK/nk_irq.o $NK/nk_bal.o \
    $NK/x64s_atomics.o $NK/x64s_ncutils.o $NK/x64s_ncsched.o $NK/x64_ctxsw.o 2>"$OUT/ld.log" \
   || { grep -v "RWX\|GNU-stack\|deprecated" "$OUT/ld.log" | c++filt | head -30; exit 1; }

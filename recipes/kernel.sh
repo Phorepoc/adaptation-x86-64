@@ -45,6 +45,7 @@ chmod +x "$SHIM/cpp"
 
 export KVIEW="$OS_ROOT" KOUT KHS KINC KROM
 export KQEMU="$SYM10/oss.FCL.sf.adapt.Qemu"
+export KSG="$SYM10/oss.FCL.sf.os.graphics/graphicsresourceservices"   # the Graphics Resource kernel side (make_ekern.sh)
 export SECONDARY=rom
 # a release image traces panics only (the default also prints every ROM page it maps); the phone screen, pixel-doubled
 # 1:1 at first boot (no scrollbars in a normal window); the display then refits the window by the largest integer scale.
