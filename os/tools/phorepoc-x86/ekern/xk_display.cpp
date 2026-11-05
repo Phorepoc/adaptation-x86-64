@@ -31,6 +31,11 @@ struct SFb { TUint32 iPhys, iPitch, iWidth, iHeight, iBpp, iRgb; };
 static SFb TheFb;
 static TInt TheMode;
 static TInt TheDisplayState = 1;			// on
+// The lights, as the A64 display driver's: display state off = the backlight at its floor (dim); EDisplayHalSetBacklightOn 0
+// = the screensaver's display off (dark), cleared by any display-on. A PC has no backlight: the flusher shades what it copies
+// (LightsChanged, Shade below; without the shadow -- a fast 1:1 framebuffer -- the picture stays lit).
+static TBool TheBacklightOff;
+static void LightsChanged();
 
 static TLinAddr ScreenAddress();			// X4.23: the shadow screen, when there is one
 static TInt ScreenPitch();
@@ -166,7 +171,20 @@ static TInt DisplayHal(TAny*, TInt aFunction, TAny* a1, TAny* a2)
 		return KErrNone;
 	case EDisplayHalSetState:
 		TheDisplayState = a1 ? 1 : 0;
+		if (TheDisplayState)
+			TheBacklightOff = EFalse;								// lights on = out of the screensaver's display off
+		LightsChanged();
 		return KErrNone;
+	case EDisplayHalSetBacklightOn:									// HAL EBacklightState (the screensaver's display off)
+		TheBacklightOff = !a1;
+		LightsChanged();
+		return KErrNone;
+	case EDisplayHalBacklightOn:
+		{
+		TInt v = !TheBacklightOff;
+		kumemput32(a1, &v, sizeof(v));
+		return KErrNone;
+		}
 	case EDisplayHalCurrentModeInfo:
 	case EDisplayHalSpecifiedModeInfo:
 		{
@@ -341,6 +359,35 @@ void X64SetCursorPos(TInt aX, TInt aY)					// xk_keyboard.cpp, on every pointer 
 	TheCursorX = aX;
 	}
 
+// The lights' shade of the picture: 0 = lit, 1 = dim (a quarter), 2 = dark. The HAL says what it wants (LightsChanged);
+// the flusher switches at the start of a pass and repaints everything, so it never mixes two shades in one picture.
+static volatile TInt TheShadeWanted;
+static TInt TheShade;
+static volatile TBool TheFrameAfterWake;			// the frame log: report the first frame after the screen comes on
+static void LightsChanged()
+	{
+	const TInt s = TheBacklightOff ? 2 : TheDisplayState ? 0 : 1;
+	if (s == TheShadeWanted)
+		return;
+	Kern::Printf(s == 2 ? "[EKERN][disp] backlight OFF (screensaver)" : s == 1 ? "[EKERN][disp] blank (backlight dim)" :
+				 "[EKERN][disp] unblank (backlight on)");
+	if (s == 0)
+		TheFrameAfterWake = ETrue;
+	TheShadeWanted = s;
+	}
+static inline TUint32 Shade(TUint32 aP)
+	{
+	return TheShade == 0 ? aP : TheShade == 1 ? (aP & 0xFF000000u) | (aP >> 2 & 0x3F3F3F) : aP & 0xFF000000u;
+	}
+
+// the mirror no longer matches the framebuffer: the next flush repaints everything
+static void MirrorStale()
+	{
+	const TInt n = X64ScreenW * X64ScreenH;
+	for (TInt i=0; i<n; ++i)
+		TheMirror[i] = ~TheScreen[(i / X64ScreenW) * ScreenWpl() + i % X64ScreenW];
+	}
+
 // what the framebuffer shows at (aX,aY) without the cursor: the screen's pixel, or the black border
 static inline TUint32 ScreenPixelAt(TInt aX, TInt aY)
 	{
@@ -348,7 +395,7 @@ static inline TUint32 ScreenPixelAt(TInt aX, TInt aY)
 	if (x < 0 || y < 0)
 		return 0;
 	const TInt sx = x / X64Scale, sy = y / X64Scale;
-	return (sx < X64ScreenW && sy < X64ScreenH) ? TheScreen[sy*ScreenWpl() + sx] : 0;
+	return (sx < X64ScreenW && sy < X64ScreenH) ? Shade(TheScreen[sy*ScreenWpl() + sx]) : 0;
 	}
 
 // the cursor rectangle at framebuffer (aX,aY), clipped: the arrow, or (aDraw false) what is under it
@@ -396,10 +443,16 @@ static void FrameRecord()
 		return;
 	++TheFrames;
 	const TUint wp = white * 100 / n;
+	const TUint32 ms = (TUint32)(((TUint64)NKern::TickCount() * NKern::TickPeriod()) / 1000);
+	if (TheFrameAfterWake)
+		{
+		TheFrameAfterWake = EFalse;
+		Kern::Printf("[EKERN][frame] first frame after screen-on #%u t=%u ms white=%u%% black=%u%% sum=%08x",
+					 TheFrames, ms, wp, black * 100 / n, sum);
+		}
 	if (wp >= 85 && TheFramePrevWhite < 40)
 		{
 		++TheWhiteFlashes;
-		const TUint32 ms = (TUint32)(((TUint64)NKern::TickCount() * NKern::TickPeriod()) / 1000);
 		if (ms - TheLastWhiteLineMs >= 100)							// (bounded: at most 10 lines a second)
 			{
 			TheLastWhiteLineMs = ms;
@@ -419,6 +472,11 @@ static void FlushDfcFn(TAny*)
 	const TInt aw = X64ActiveW, ah = X64ActiveH;					// the part on the display
 	volatile TUint32* origin = fb + X64ScreenOy*wpl + X64ScreenOx;
 	TBool underCursor = EFalse;
+	if (TheShade != TheShadeWanted)
+		{
+		TheShade = TheShadeWanted;
+		MirrorStale();
+		}
 	for (TInt y=0; y<ah; ++y)
 		{
 		const TUint32* src = TheScreen + y*ScreenWpl();
@@ -434,14 +492,14 @@ static void FlushDfcFn(TAny*)
 		MarkDirty(X64ScreenOx + first*s, X64ScreenOy + y*s, X64ScreenOx + (last + 1)*s, X64ScreenOy + (y + 1)*s);
 		if (s == 1)
 			for (TInt x=first; x<=last; ++x)
-				row[x] = m[x] = src[x];
+				row[x] = Shade(m[x] = src[x]);
 		else
 			for (TInt k=0; k<s; ++k)								// s framebuffer lines per screen line
 				{
 				volatile TUint32* line = row + k*wpl;
 				for (TInt x=first; x<=last; ++x)
 					{
-					const TUint32 p = src[x];
+					const TUint32 p = Shade(src[x]);
 					for (TInt j=0; j<s; ++j)
 						line[x*s + j] = p;
 					}
@@ -454,7 +512,7 @@ static void FlushDfcFn(TAny*)
 		if (fy + s > TheDrawnY && fy < TheDrawnY + KCurH)
 			underCursor = ETrue;
 		}
-	const TInt nx = TheCursorX, ny = TheCursorY;
+	const TInt nx = TheShade == 2 ? -1 : TheCursorX, ny = TheCursorY;	// dark: no cursor either
 	const TBool moved = nx != TheDrawnX || ny != TheDrawnY;
 	if (moved && TheDrawnX >= 0)
 		CursorRect(fb, wpl, TheDrawnX, TheDrawnY, EFalse);		// put back what WSERV drew there
@@ -630,9 +688,7 @@ static void ModeDfcFn(TAny*)
 #endif
 	PlaceScreen();
 	memclr((TAny*)TheFbChunk->LinearAddress(), TheFb.iPitch * TheFb.iHeight);
-	const TInt n = X64ScreenW * X64ScreenH;			// the mirror no longer matches: redraw everything
-	for (TInt i=0; i<n; ++i)
-		TheMirror[i] = ~TheScreen[(i / X64ScreenW) * ScreenWpl() + i % X64ScreenW];
+	MirrorStale();
 	TheDrawnX = TheDrawnY = -1;						// the cursor's saved background is gone too
 	Kern::Printf("[display] host resize: %dx%d asked -> framebuffer %dx%d, screen x%d at (%d,%d)",
 					TheReqW, TheReqH, X64FbW, X64FbH, X64Scale, X64ScreenOx, X64ScreenOy);
