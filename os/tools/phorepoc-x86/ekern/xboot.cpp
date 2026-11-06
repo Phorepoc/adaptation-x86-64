@@ -47,6 +47,7 @@ TAny* X64CreatePdd_sound();
 TAny* X64CreateLdd_camerasc();									// xk_camerasc.cpp (camera C1)
 TAny* X64CreatePdd_camerasc();
 TAny* X64CreateLdd_sgdevice();									// xk_sgresource.cpp (Graphics Resource)
+TAny* X64CreateLdd_pipe();										// xk_pipe.cpp (pipe driver)
 extern char __utext_base[], __utext_end[], __uimage_base[];
 void kmain(TUint32 aMultibootInfo);
 }
@@ -548,6 +549,7 @@ extern "C" void kmain(TUint32 aMultibootInfo)
 					case 5: f = SYMVAL(X64CreateLdd_camerasc); break;	// Sys\Bin\ecamerasc.ldd (camera C1)
 					case 6: f = SYMVAL(X64CreatePdd_camerasc); break;	// Sys\Bin\camerasc.pdd
 					case 7: f = SYMVAL(X64CreateLdd_sgdevice); break;	// Sys\Bin\sgdevice.ldd (Graphics Resource, RSgImage)
+					case 8: f = SYMVAL(X64CreateLdd_pipe); break;		// pipelib.ldd (Open C pipe())
 					default: Die("ROM section: unknown built-in device id");
 					}
 				d.iEntryPoint = SYMVAL(X64ExtensionEntry);

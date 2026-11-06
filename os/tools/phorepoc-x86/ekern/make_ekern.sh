@@ -163,6 +163,9 @@ $CXX $DEFS $INCS $PRE -c "$EK/xk_timesync.cpp" -o "$OUT/xk_timesync.o"
 # X4.47: the e1000 NIC (PDD) + the REAL Ethernet LDD (unmodified; only its entry point is renamed)
 $CXX $DEFS $INCS $MED $PRE -DCreateLogicalDevice=CreateLogicalDevice_enet -c "$EKA/drivers/ethernet/d_ethernet.cpp" -o "$OUT/d_ethernet.o"
 $CXX $DEFS $INCS $MED $PRE -c "$EK/xk_e1000.cpp" -o "$OUT/xk_e1000.o"
+# Open C pipe(): the REAL pipe LDD (unmodified; entry points renamed) as the built-in device pipelib.ldd
+$CXX $DEFS $INCS $MED $PRE -I "$EKA/drivers/pipe" -DCreateLogicalDevice=CreateLogicalDevice_pipe -DKernelModuleEntry=KernelModuleEntry_pipe -c "$EKA/drivers/pipe/dpipe.cpp" -o "$OUT/dpipe.o"
+$CXX $DEFS $INCS $MED $PRE -c "$EK/xk_pipe.cpp" -o "$OUT/xk_pipe.o"
 # X4.88: AC'97 audio (PDD) + the REAL shared-chunk sound LDD (unmodified; entry renamed). SOUND_TEST=1: a boot sine
 $CXX $DEFS $INCS $MED $PRE -DCreateLogicalDevice=CreateLogicalDevice_soundsc -DKernelModuleEntry=KernelModuleEntry_soundsc -c "$EKA/drivers/soundsc/soundldd.cpp" -o "$OUT/soundldd.o"
 $CXX $DEFS $INCS $MED $PRE -c "$EK/xk_ac97.cpp" -o "$OUT/xk_ac97.o"
@@ -216,7 +219,7 @@ echo "[4/5] link at EKA2's native addresses"
 NK=$KOUT/nkernsmp
 ld -m elf32_x86_64 -n -z max-page-size=0x1000 -T "$EK/ekern.lds" -Map "$OUT/ekern.map" -o "$OUT/ekern.elf32" \
    "$OUT/boot.o" "$OUT/xboot.o" "$OUT/xk_entry.o" "$OUT/xk_irq.o" "$OUT/xk_smp.o" "$OUT/ncirq.o" "$OUT/xk_interrupt.o" "$OUT/xk_aptramp.o" "$OUT/xk_minisec.o" "$OUT/xk_uimage.o" "$OUT/exstart.o" "$OUT/xk_vectors.o" \
-   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/sgextension.o" "$OUT/sgresource_k.o" "$OUT/sgdevice.o" "$OUT/sgchannel.o" "$OUT/xk_sgresource.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
+   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/dpipe.o" "$OUT/xk_pipe.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/sgextension.o" "$OUT/sgresource_k.o" "$OUT/sgdevice.o" "$OUT/sgchannel.o" "$OUT/xk_sgresource.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
    $NK/nklib.o $NK/nkern.o $NK/nkerns.o $NK/sched.o $NK/dfcs.o $NK/nk_timer.o $NK/nk_irq.o $NK/nk_bal.o \
    $NK/x64s_atomics.o $NK/x64s_ncutils.o $NK/x64s_ncsched.o $NK/x64_ctxsw.o 2>"$OUT/ld.log" \
   || { grep -v "RWX\|GNU-stack\|deprecated" "$OUT/ld.log" | c++filt | head -30; exit 1; }
