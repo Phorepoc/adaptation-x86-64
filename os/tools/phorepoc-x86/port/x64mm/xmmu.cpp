@@ -478,10 +478,17 @@ void Mmu::PagesAllocated(TPhysAddr* aPageList, TUint aCount, TRamAllocFlags aFla
 			TLinAddr tempLinAddr = iTempMap[0].iLinAddr;
 			TPte* tempPte = iTempMap[0].iPtePtr;
 
+			// PHOREPOC x64: the temporary mapping is used by one thread at a time (the RAM allocator lock) and every use
+			// invalidates it on the CPU it runs on before touching it, so the use is pinned to this CPU (NKern::Lock) and
+			// only invalidated locally. ARM has broadcast TLB maintenance; here InvalidateTLBForPage is an IPI to every other
+			// CPU and a wait for it, twice per wiped page: with the other vCPU idle (halted) that was about 0.65 ms each,
+			// 1.3 ms per allocated page -- a 4 MB texture buffer took 1.3 s to commit (symvmw, mesa-symbian drm_symbian_vmw.c).
+			NKern::Lock();
+
 			// temporarily map page...
 			*tempPte = pagePhys | iTempPteCached;
 			CacheMaintenance::SinglePteUpdated((TLinAddr)tempPte);
-			InvalidateTLBForPage(tempLinAddr|KKernelOsAsid);
+			LocalInvalidateTLBForPage(tempLinAddr|KKernelOsAsid);
 
 			// wipe contents of memory...
 			memset((TAny*)tempLinAddr, wipeByte, KPageSize);
@@ -490,7 +497,9 @@ void Mmu::PagesAllocated(TPhysAddr* aPageList, TUint aCount, TRamAllocFlags aFla
 			// invalidate temporary mapping...
 			*tempPte = KPteUnallocatedEntry;
 			CacheMaintenance::SinglePteUpdated((TLinAddr)tempPte);
-			InvalidateTLBForPage(tempLinAddr|KKernelOsAsid);
+			LocalInvalidateTLBForPage(tempLinAddr|KKernelOsAsid);
+
+			NKern::Unlock();
 			}
 
 		// indicate page has been allocated...
