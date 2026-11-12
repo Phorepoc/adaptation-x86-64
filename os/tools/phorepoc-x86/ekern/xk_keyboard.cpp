@@ -367,8 +367,9 @@ void DPcI8042::PointerTo(TInt aFx, TInt aFy)
 	{
 	iFx = aFx < 0 ? 0 : (aFx >= X64FbW ? X64FbW-1 : aFx);
 	iFy = aFy < 0 ? 0 : (aFy >= X64FbH ? X64FbH-1 : aFy);
-	TInt x = iFx < X64ScreenOx ? 0 : (iFx - X64ScreenOx) / X64Scale;
-	TInt y = iFy < X64ScreenOy ? 0 : (iFy - X64ScreenOy) / X64Scale;
+	extern void X64FbToScreen(TInt aFx, TInt aFy, TInt& aX, TInt& aY);	// xk_display.cpp: through the display's rotation
+	TInt x, y;
+	X64FbToScreen(iFx, iFy, x, y);
 	x = x >= iWidth ? iWidth-1 : x;
 	y = y >= iHeight ? iHeight-1 : y;
 	// the host draws its own pointer while the mouse is absolute (VMMDev: GUEST_NEEDS_HOST_CURSOR)

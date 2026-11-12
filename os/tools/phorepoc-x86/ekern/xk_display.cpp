@@ -64,7 +64,17 @@ static TInt ScreenPitch();
 #ifndef XK_DYNRES
 #define XK_DYNRES 0
 #endif
-enum { EDisplayHalPhoreActive = 0x7101, EDisplayHalPhoreRequest = 0x7102 };
+enum { EDisplayHalPhoreActive = 0x7101, EDisplayHalPhoreRequest = 0x7102, EDisplayHalPhoreRotate = 0x7103 };
+// Display rotation (a monitor or a VM window can turn, a phone panel cannot): WSERV draws a rotated screen mode into the
+// shadow screen rotated (the board's draw device, CFbsDrawDevice::SetOrientation), and that draw device tells the display
+// its orientation through EDisplayHalPhoreRotate (CFbsDrawDevice::TOrientation: 0 normal, 1 rotated 90, 3 rotated 270).
+// The display then turns its own mode (the framebuffer becomes the shadow's height x width) and the flusher copies the
+// shadow turned back, so the picture is upright in a window of the mode's shape. The shadow, WSERV's address, pitch and
+// size never change; the pointer is mapped back into shadow pixels (X64FbToScreen).
+TInt X64Rot;								// the shadow's orientation as the display undoes it: 0, 1 or 3
+static TInt TheRotWanted;
+static inline TInt DispW() { return X64Rot ? X64ScreenH : X64ScreenW; }		// the screen as the display shows it
+static inline TInt DispH() { return X64Rot ? X64ScreenW : X64ScreenH; }
 void X64DisplayRequestMode(TInt aW, TInt aH);
 TInt X64ScreenW, X64ScreenH;				// what the HAL reports (the i8042 mouse area follows it)
 TInt X64ActiveW, X64ActiveH;				// the part of it that is on the display (the whole of it unless XK_DYNRES)
@@ -209,6 +219,12 @@ static TInt DisplayHal(TAny*, TInt aFunction, TAny* a1, TAny* a2)
 	case EDisplayHalPhoreRequest:
 		X64DisplayRequestMode((TInt)a1, (TInt)a2);
 		return KErrNone;
+	case EDisplayHalPhoreRotate:
+		{
+		extern void X64DisplayRotate(TInt aOrientation);
+		X64DisplayRotate((TInt)a1);
+		return KErrNone;
+		}
 	case EDisplayHalWsRegisterSwitchOnScreenHandling:
 	case EDisplayHalWsSwitchOnScreen:
 		return KErrNone;
@@ -321,6 +337,8 @@ static NTimer TheFlushTimer(FlushTimerIsr, NULL);
 static TDfc TheFlushDfc(FlushDfcFn, NULL, 1);
 static void ModeDfcFn(TAny*);								// X4.45: a host resize, on the same queue
 static TDfc TheModeDfc(ModeDfcFn, NULL, 2);
+static void RotDfcFn(TAny*);								// the display turns (EDisplayHalPhoreRotate), on the same queue
+static TDfc TheRotDfc(RotDfcFn, NULL, 2);
 
 static void FlushTimerIsr(TAny*)
 	{
@@ -394,8 +412,14 @@ static inline TUint32 ScreenPixelAt(TInt aX, TInt aY)
 	const TInt x = aX - X64ScreenOx, y = aY - X64ScreenOy;
 	if (x < 0 || y < 0)
 		return 0;
-	const TInt sx = x / X64Scale, sy = y / X64Scale;
-	return (sx < X64ScreenW && sy < X64ScreenH) ? Shade(TheScreen[sy*ScreenWpl() + sx]) : 0;
+	TInt sx = x / X64Scale, sy = y / X64Scale;
+	if (sx >= DispW() || sy >= DispH())
+		return 0;
+	if (X64Rot == 1)
+		{ const TInt t = sx;  sx = X64ScreenW - 1 - sy;  sy = t; }
+	else if (X64Rot == 3)
+		{ const TInt t = sx;  sx = sy;  sy = X64ScreenH - 1 - t; }
+	return Shade(TheScreen[sy*ScreenWpl() + sx]);
 	}
 
 // the cursor rectangle at framebuffer (aX,aY), clipped: the arrow, or (aDraw false) what is under it
@@ -488,6 +512,25 @@ static void FlushDfcFn(TAny*)
 			continue;
 		while (src[last] == m[last])
 			--last;
+		if (X64Rot)
+			{
+			// shadow (x, y) -> display (dx, dy): rotation 1 = (y, W-1-x), rotation 3 = (H-1-y, x)
+			const TInt dx = X64Rot == 1 ? y : X64ScreenH - 1 - y;
+			for (TInt x=first; x<=last; ++x)
+				{
+				const TUint32 p = Shade(m[x] = src[x]);
+				const TInt dy = X64Rot == 1 ? X64ScreenW - 1 - x : x;
+				volatile TUint32* blk = origin + dy*s*wpl + dx*s;
+				for (TInt k=0; k<s; ++k)
+					for (TInt j=0; j<s; ++j)
+						blk[k*wpl + j] = p;
+				}
+			const TInt dy0 = X64Rot == 1 ? X64ScreenW - 1 - last : first, dy1 = X64Rot == 1 ? X64ScreenW - 1 - first : last;
+			MarkDirty(X64ScreenOx + dx*s, X64ScreenOy + dy0*s, X64ScreenOx + (dx + 1)*s, X64ScreenOy + (dy1 + 1)*s);
+			++TheFlushedRows;
+			underCursor = ETrue;
+			continue;
+			}
 		volatile TUint32* row = origin + y*s*wpl;
 		MarkDirty(X64ScreenOx + first*s, X64ScreenOy + y*s, X64ScreenOx + (last + 1)*s, X64ScreenOy + (y + 1)*s);
 		if (s == 1)
@@ -554,6 +597,7 @@ static TInt StartShadow()
 		return r;
 	TheFlushDfc.SetDfcQ(TheFlushQ);
 	TheModeDfc.SetDfcQ(TheFlushQ);
+	TheRotDfc.SetDfcQ(TheFlushQ);
 	TheFlushTimer.OneShot(NKern::TimerTicks(KFlushMs));
 	return KErrNone;
 	}
@@ -645,8 +689,8 @@ static void PlaceScreen()
 	TheScreenOffset = 0;
 	return;
 #endif
-	X64ScreenOx = (TheFb.iWidth - X64ScreenW * X64Scale) / 2;
-	X64ScreenOy = (TheFb.iHeight - X64ScreenH * X64Scale) / 2;
+	X64ScreenOx = (TheFb.iWidth - DispW() * X64Scale) / 2;
+	X64ScreenOy = (TheFb.iHeight - DispH() * X64Scale) / 2;
 	TheScreenOffset = X64ScreenOy * TheFb.iPitch + X64ScreenOx * 4;
 	}
 
@@ -673,7 +717,7 @@ static void ModeDfcFn(TAny*)
 	// X4.139: the display takes the asked size (up to the shadow screen's), 1:1; the shadow keeps its size
 	const TInt w = Min(Max(TheReqW, 320), X64ScreenW), h = Min(Max(TheReqH, 200), X64ScreenH);
 #else
-	const TInt w = Max(TheReqW, X64ScreenW), h = Max(TheReqH, X64ScreenH);	// never smaller than the phone
+	const TInt w = Max(TheReqW, DispW()), h = Max(TheReqH, DispH());	// never smaller than the phone (as the display shows it)
 #endif
 	if (w * h * 4 > KFbMapMax || (w == (TInt)TheFb.iWidth && h == (TInt)TheFb.iHeight))
 		return;
@@ -684,7 +728,7 @@ static void ModeDfcFn(TAny*)
 	X64ActiveW = Min(X64FbW, X64ScreenW);  X64ActiveH = Min(X64FbH, X64ScreenH);
 	++TheDisplayGen;
 #else
-	X64Scale = Max(1, Min(X64FbW / X64ScreenW, X64FbH / X64ScreenH));
+	X64Scale = Max(1, Min(X64FbW / DispW(), X64FbH / DispH()));
 #endif
 	PlaceScreen();
 	memclr((TAny*)TheFbChunk->LinearAddress(), TheFb.iPitch * TheFb.iHeight);
@@ -692,6 +736,50 @@ static void ModeDfcFn(TAny*)
 	TheDrawnX = TheDrawnY = -1;						// the cursor's saved background is gone too
 	Kern::Printf("[display] host resize: %dx%d asked -> framebuffer %dx%d, screen x%d at (%d,%d)",
 					TheReqW, TheReqH, X64FbW, X64FbH, X64Scale, X64ScreenOx, X64ScreenOy);
+	}
+
+// the display's orientation changes: the mode turns (the same scale), the screen is placed again and repainted. On the
+// flusher's queue, as a host resize. DYNRES images keep their own sizing (no rotation there)
+void X64DisplayRotate(TInt aOrientation)
+	{
+	const TInt r = (aOrientation == 1 || aOrientation == 3) ? aOrientation : 0;
+	if (!TheScreenChunk || XK_DYNRES)
+		return;
+	TheRotWanted = r;
+	TheRotDfc.Enque();
+	}
+
+static void RotDfcFn(TAny*)
+	{
+	if (TheRotWanted == X64Rot)
+		return;
+	const TInt s = X64Scale;
+	X64Rot = TheRotWanted;
+	const TInt w = DispW() * s, h = DispH() * s;
+	if (w * h * 4 <= KFbMapMax)
+		SetMode(w, h);
+	X64FbW = TheFb.iWidth;  X64FbH = TheFb.iHeight;
+	X64Scale = Max(1, Min(X64FbW / DispW(), X64FbH / DispH()));
+	PlaceScreen();
+	memclr((TAny*)TheFbChunk->LinearAddress(), TheFb.iPitch * TheFb.iHeight);
+	MirrorStale();
+	TheDrawnX = TheDrawnY = -1;
+	MarkDirty(0, 0, TheFb.iWidth, TheFb.iHeight);
+	Kern::Printf("[display] rotation %d: framebuffer %dx%d, screen %dx%d shown x%d at (%d,%d)",
+					X64Rot, X64FbW, X64FbH, DispW(), DispH(), X64Scale, X64ScreenOx, X64ScreenOy);
+	}
+
+// a framebuffer pixel -> the shadow pixel under it (the pointer: xk_keyboard.cpp), clamped to the screen
+void X64FbToScreen(TInt aFx, TInt aFy, TInt& aX, TInt& aY)
+	{
+	TInt x = aFx < X64ScreenOx ? 0 : (aFx - X64ScreenOx) / X64Scale;
+	TInt y = aFy < X64ScreenOy ? 0 : (aFy - X64ScreenOy) / X64Scale;
+	x = Min(x, DispW() - 1);  y = Min(y, DispH() - 1);
+	if (X64Rot == 1)
+		{ const TInt t = x;  x = X64ScreenW - 1 - y;  y = t; }
+	else if (X64Rot == 3)
+		{ const TInt t = x;  x = y;  y = X64ScreenH - 1 - t; }
+	aX = x;  aY = y;
 	}
 
 void X64StartDisplay()
