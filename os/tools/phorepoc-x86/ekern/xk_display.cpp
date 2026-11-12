@@ -71,12 +71,12 @@ enum { EDisplayHalPhoreActive = 0x7101, EDisplayHalPhoreRequest = 0x7102, EDispl
 // The display then turns its own mode (the framebuffer becomes the shadow's height x width) and the flusher copies the
 // shadow turned back, so the picture is upright in a window of the mode's shape. The shadow, WSERV's address, pitch and
 // size never change; the pointer is mapped back into shadow pixels (X64FbToScreen).
+TInt X64ScreenW, X64ScreenH;				// what the HAL reports (the i8042 mouse area follows it)
 TInt X64Rot;								// the shadow's orientation as the display undoes it: 0, 1 or 3
 static TInt TheRotWanted;
 static inline TInt DispW() { return X64Rot ? X64ScreenH : X64ScreenW; }		// the screen as the display shows it
 static inline TInt DispH() { return X64Rot ? X64ScreenW : X64ScreenH; }
 void X64DisplayRequestMode(TInt aW, TInt aH);
-TInt X64ScreenW, X64ScreenH;				// what the HAL reports (the i8042 mouse area follows it)
 TInt X64ActiveW, X64ActiveH;				// the part of it that is on the display (the whole of it unless XK_DYNRES)
 static TInt TheDisplayGen;					// counts the active-size changes (clients poll it)
 // The shadow screen's words per line: rows padded to 64 bytes, as the real S^3 hardware lays them out (the HAL
