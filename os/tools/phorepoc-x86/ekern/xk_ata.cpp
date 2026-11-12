@@ -11,7 +11,7 @@
 // pccd_ata's MBR rules (default boot partition first, then the other FAT/FAT32 primaries).
 //
 // Hardware: the legacy primary IDE channel (0x1F0-0x1F7 + control 0x3F6), master drive, LBA28 PIO
-// (READ/WRITE SECTORS, CACHE FLUSH after every write request). That is what QEMU's PIIX IDE and
+// (READ/WRITE SECTORS; CACHE FLUSH after each short, metadata-sized write: see Transfer()). That is what QEMU's PIIX IDE and
 // VirtualBox's default PIIX4 controller present, with no PCI work. The drive's interrupt is masked
 // (nIEN): each sector's DRQ is polled -- for a PIO transfer the data is ready almost at once, and a
 // command that stays busy is waited out with NKern::Sleep. X64_TODO: IRQ 14 + a semaphore, bus-master
@@ -37,7 +37,8 @@ static const TUint8 KStBsy = 0x80, KStDrdy = 0x40, KStDf = 0x20, KStDrq = 0x08, 
 static const TUint8 KCtrlNIen = 0x02, KCtrlSrst = 0x04;
 static const TUint8 KCmdReadSectors = 0x20, KCmdWriteSectors = 0x30, KCmdFlushCache = 0xE7, KCmdIdentify = 0xEC;
 static const TInt KSectorSize = 512, KSectorShift = 9;
-static const TInt KBufSectors = 32;						// 16 KB bounce buffer per command
+static const TInt KBufSectors = 128;						// 64 KB bounce buffer per command (the FAT writes file data 32 KB+ at a time)
+static const TInt KFlushBelow = 16*1024;				// see Transfer(): only a write shorter than this ends with CACHE FLUSH
 static const TInt KTimeoutMs = 5000;
 
 static inline TUint8 Inb(TUint16 aPort)
@@ -247,7 +248,11 @@ TInt DMediaDriverAta::Transfer(TLocDrvRequest& m, TBool aWrite)
 			}
 		done += chunk;
 		}
-	return aWrite ? Flush() : KErrNone;
+	// CACHE FLUSH (a host fsync under QEMU / VirtualBox) only after a short write: the FAT's own metadata (FAT sectors,
+	// directory entries) goes in small requests and always follows a file's data, so the flush after it also persists the
+	// bulk data written before it. A flush after every 32 KB of file data dominated big extractions.
+	// (The 2010 pccd_ata issues no flush at all.)
+	return (aWrite && len < KFlushBelow) ? Flush() : KErrNone;
 	}
 
 TInt DMediaDriverAta::Caps(TLocDrvRequest& m)
