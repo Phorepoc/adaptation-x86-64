@@ -851,13 +851,16 @@ void X64StartDisplay()
 		Bandwidth("framebuffer", (volatile TUint32*)TheFbChunk->LinearAddress(), 256*1024, 4, fb);
 		memclr((TAny*)TheFbChunk->LinearAddress(), 256*1024);
 		// make_ekern.sh FBSHADOW=0|1 overrides the measurement (A/B testing); default -1 = decide.
-		// A scaled screen always has the shadow: the flusher is what scales (X4.35).
-		if (X64Scale > 1 || XK_DYNRES || TheSvga || XK_FB_SHADOW == 1 || (XK_FB_SHADOW < 0 && (fb[0]*4 < ram[0] || fb[1]*4 < ram[1])))
+		// A scaled screen always has the shadow: the flusher is what scales (X4.35). So does every screen that can turn
+		// (EDisplayHalPhoreRotate): the flusher is what turns the picture back, and WSERV's screen address must stay the same
+		// across a turn -- a board whose default mode is the other shape (the PC: landscape) turns at boot. Drawing directly
+		// into a fast framebuffer is left for FBSHADOW=0 (A/B timing only; no rotation then).
+		if (X64Scale > 1 || XK_DYNRES || TheSvga || XK_FB_SHADOW != 0)
 			{
 			r = StartShadow();
 			Kern::Printf("[display] shadow screen at %08x (%s), flushed x%d every %d ms -> %d",
 							TheScreenChunk ? TheScreenChunk->LinearAddress() : 0,
-							X64Scale > 1 ? "scaled" : TheSvga ? "SVGA: the flusher reports the dirty rectangles" : "slow framebuffer", X64Scale, KFlushMs, r);
+							X64Scale > 1 ? "scaled" : TheSvga ? "SVGA: the flusher reports the dirty rectangles" : "the flusher turns it", X64Scale, KFlushMs, r);
 			if (r != KErrNone)
 				{
 				TheScreenChunk = NULL;
