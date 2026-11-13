@@ -198,6 +198,18 @@ $CXX $DEFS $INCS $SGI $PRE -c "$KSG/graphicsresourceimplementation/src/sgresourc
 $CXX $DEFS $INCS $SGI $PRE -DCreateLogicalDevice=CreateLogicalDevice_sgdev -DKernelModuleEntry=KernelModuleEntry_sgdev \
      -c "$KSG/graphicsresourceimplementation/src/sgdevice.cpp" -o "$OUT/sgdevice.o"
 $CXX $DEFS $INCS $SGI $PRE -c "$KSG/graphicsresourceimplementation/src/sgchannel.cpp" -o "$OUT/sgchannel.o"
+# The NGA surface manager (RSurfaceManager): the REAL 2010 reference driver (surfacemgrcommon, unmodified, entry points renamed),
+# as the ARM boards link it; installed by xk_sgresource.cpp (extension) + the built-in device surfacemanagerdriver.ldd. Its
+# <graphics/...> includes are the graphics package's exported headers, linked into $OUT/sminc under that name.
+KSM="${KSM:-baseline/symbian-2010/oss.FCL.sf.adapt.NokiaGraphics/graphicscompositionref/surfacemgrcommon}"
+KGR="${KSG%/graphicsresourceservices}"
+rm -rf "$OUT/sminc"; mkdir -p "$OUT/sminc/graphics"
+for h in "$KGR"/graphicsutils/commongraphicsheaders/inc/surface*.h "$KGR"/graphicshwdrivers/surfacemgr/inc/surfacemanager.h; do
+  ln -sf "$(cd "$(dirname "$h")" && pwd)/$(basename "$h")" "$OUT/sminc/graphics/"; done
+SMI="-I $KSM/inc -I $OUT/sminc"
+$CXX $DEFS $INCS $SMI $PRE -DInitExtension=InitExtension_surfmgr -DKernelModuleEntry=KernelModuleEntry_surfmgr \
+     -DCreateLogicalDevice=CreateLogicalDevice_surfmgr -c "$KSM/src/surfacemanagerdriver.cpp" -o "$OUT/surfacemanagerdriver.o"
+$CXX $DEFS $INCS $SMI $PRE -c "$KSM/src/extension.cpp" -o "$OUT/surfacemanager_ext.o"
 $CXX $DEFS $INCS $PRE -c "$EK/xk_sgresource.cpp" -o "$OUT/xk_sgresource.o"
 # X4.27 debug aid: DUMP=<s> dumps every thread (state + symbolizable user stack) once, s seconds in
 $CXX $DEFS $INCS $PRE -fno-access-control -c "$EK/xk_threaddump.cpp" -o "$OUT/xk_threaddump.o"
@@ -219,7 +231,7 @@ echo "[4/5] link at EKA2's native addresses"
 NK=$KOUT/nkernsmp
 ld -m elf32_x86_64 -n -z max-page-size=0x1000 -T "$EK/ekern.lds" -Map "$OUT/ekern.map" -o "$OUT/ekern.elf32" \
    "$OUT/boot.o" "$OUT/xboot.o" "$OUT/xk_entry.o" "$OUT/xk_irq.o" "$OUT/xk_smp.o" "$OUT/ncirq.o" "$OUT/xk_interrupt.o" "$OUT/xk_aptramp.o" "$OUT/xk_minisec.o" "$OUT/xk_uimage.o" "$OUT/exstart.o" "$OUT/xk_vectors.o" \
-   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/dpipe.o" "$OUT/xk_pipe.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/sgextension.o" "$OUT/sgresource_k.o" "$OUT/sgdevice.o" "$OUT/sgchannel.o" "$OUT/xk_sgresource.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
+   "$OUT/locmedia.o" "$OUT/dmasupport.o" "$OUT/iram.o" "$OUT/xk_media.o" "$OUT/xk_ata.o" "$OUT/xk_display.o" "$OUT/xk_keyboard.o" "$OUT/xk_absmouse.o" "$OUT/xk_timesync.o" "$OUT/d_ethernet.o" "$OUT/xk_e1000.o" "$OUT/dpipe.o" "$OUT/xk_pipe.o" "$OUT/soundldd.o" "$OUT/xk_ac97.o" "$OUT/xk_hda.o" "$OUT/xk_sound.o" "$OUT/xk_vmwsvga.o" "$OUT/sgextension.o" "$OUT/sgresource_k.o" "$OUT/sgdevice.o" "$OUT/sgchannel.o" "$OUT/xk_sgresource.o" "$OUT/surfacemanagerdriver.o" "$OUT/surfacemanager_ext.o" "$OUT/cameraldd.o" "$OUT/camerasc_pdd.o" "$OUT/camerasc_sensor.o" "$OUT/xk_camerasc.o" "$OUT/xk_threaddump.o" "$OUT/xk_power.o" "$KOBJ"/*.o \
    $NK/nklib.o $NK/nkern.o $NK/nkerns.o $NK/sched.o $NK/dfcs.o $NK/nk_timer.o $NK/nk_irq.o $NK/nk_bal.o \
    $NK/x64s_atomics.o $NK/x64s_ncutils.o $NK/x64s_ncsched.o $NK/x64_ctxsw.o 2>"$OUT/ld.log" \
   || { grep -v "RWX\|GNU-stack\|deprecated" "$OUT/ld.log" | c++filt | head -30; exit 1; }

@@ -39,6 +39,7 @@ static void LightsChanged();
 
 static TLinAddr ScreenAddress();			// X4.23: the shadow screen, when there is one
 static TInt ScreenPitch();
+static TInt DisplayMemoryHandle(TAny* a1);	// EDisplayHalGetDisplayMemoryHandle (NGA): a chunk over the shadow screen
 
 // X4.26: the SCREEN the HAL reports may be a centred sub-rectangle of the framebuffer -- S60's
 // layout packs exist for phone resolutions (nHD 360x640), not for 1024x768. make_ekern.sh
@@ -225,6 +226,8 @@ static TInt DisplayHal(TAny*, TInt aFunction, TAny* a1, TAny* a2)
 		X64DisplayRotate((TInt)a1);
 		return KErrNone;
 		}
+	case EDisplayHalGetDisplayMemoryHandle:
+		return DisplayMemoryHandle(a1);
 	case EDisplayHalWsRegisterSwitchOnScreenHandling:
 	case EDisplayHalWsSwitchOnScreen:
 		return KErrNone;
@@ -281,6 +284,9 @@ static void Bandwidth(const char* aWhat, volatile TUint32* aBuf, TInt aBytes, TI
 static const TInt KFlushMs = 20;
 static DPlatChunkHw* TheScreenChunk;		// user-RW, cached: what the HAL hands out in shadow mode
 static TUint32* TheScreen;
+static TPhysAddr TheScreenPhys;				// the shadow's pages (EDisplayHalGetDisplayMemoryHandle commits a chunk over them)
+static TInt TheScreenBytes;
+static DMutex* TheMemMutex;				// serialises the first EDisplayHalGetDisplayMemoryHandle calls (made with the shadow)
 static TUint32* TheMirror;					// supervisor copy of what the framebuffer shows of the screen
 static TDfcQue* TheFlushQ;
 static TUint32 TheFlushes, TheFlushedRows;
@@ -584,6 +590,12 @@ static TInt StartShadow()
 		r = DPlatChunkHw::New(TheScreenChunk, phys, size, EMapAttrUserRw | EMapAttrCachedMax);
 	if (r != KErrNone)
 		return r;
+	TheScreenPhys = phys;
+	TheScreenBytes = size;
+	_LIT(KMemMutexName, "DisplayMem");
+	r = Kern::MutexCreate(TheMemMutex, KMemMutexName, KMutexOrdGeneral0);
+	if (r != KErrNone)
+		return r;
 	TheScreen = (TUint32*)TheScreenChunk->LinearAddress();
 	TheMirror = (TUint32*)Kern::Alloc(size);
 	if (!TheMirror)
@@ -600,6 +612,56 @@ static TInt StartShadow()
 	TheRotDfc.SetDfcQ(TheFlushQ);
 	TheFlushTimer.OneShot(NKern::TimerTicks(KFlushMs));
 	return KErrNone;
+	}
+
+// EDisplayHalGetDisplayMemoryHandle: the NGA stack (openwfsupport surfacestream.cpp, the GCE screen driver's direct screen
+// access, the board's composition back end) wants an RChunk over the screen pixels. The shadow is a DPlatChunkHw, which has
+// no DChunk to hand out, so a shared kernel chunk is committed over the SAME physical pages with the same (cached)
+// attributes: what is written through it is what the flusher shows, and there is no second copy. One chunk for the life of
+// the boot, made by the first call (WSERV's start, one thread); each call opens a handle for the caller's process (to a1).
+static DChunk* TheMemChunk;
+static TInt DisplayMemoryHandle(TAny* a1)
+	{
+	if (!TheScreenChunk || !TheMemMutex)
+		return KErrNotSupported;					// no shadow (a fast 1:1 framebuffer): no RAM of ours to hand out
+	NKern::ThreadEnterCS();
+	TInt r = KErrNone;
+	Kern::MutexWait(*TheMemMutex);
+	if (!TheMemChunk)
+		{
+		TChunkCreateInfo info;
+		info.iType = TChunkCreateInfo::ESharedKernelMultiple;
+		info.iMaxSize = TheScreenBytes;
+		info.iMapAttr = (TUint)EMapAttrCachedMax;
+		info.iOwnsMemory = EFalse;					// the pages stay the shadow's
+		info.iDestroyedDfc = NULL;
+		DChunk* c = NULL;
+		TLinAddr lin;
+		TUint32 attr;
+		r = Kern::ChunkCreate(info, c, lin, attr);
+		if (r == KErrNone)
+			{
+			r = Kern::ChunkCommitPhysical(c, 0, TheScreenBytes, TheScreenPhys);
+			if (r != KErrNone)
+				Kern::ChunkClose(c);
+			else
+				{
+				TheMemChunk = c;
+				Kern::Printf("[display] memory handle: a chunk over the shadow screen, %d bytes", TheScreenBytes);
+				}
+			}
+		}
+	if (r == KErrNone)
+		{
+		const TInt h = Kern::MakeHandleAndOpen(NULL, TheMemChunk);
+		if (h < 0)
+			r = h;
+		else
+			kumemput32(a1, &h, sizeof(h));
+		}
+	Kern::MutexSignal(*TheMemMutex);
+	NKern::ThreadLeaveCS();
+	return r;
 	}
 
 // the screen memory the HAL reports: the shadow when there is one, else the framebuffer itself
